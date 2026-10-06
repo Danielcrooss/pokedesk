@@ -10,7 +10,7 @@
 :root{--bg:#10131c;--card:#1a1e2b;--card2:#222737;--ink:#eef1f8;--mute:#8d96b0;--line:#2c3246;--acc:#4da3ff;--accink:#08111f}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.5 "Poppins",system-ui,-apple-system,"Segoe UI",sans-serif}
-main{max-width:860px;margin:0 auto;padding:20px 14px 48px}
+main{max-width:1100px;margin:0 auto;padding:20px 14px 48px}
 h1{font-size:1.7rem;font-weight:700;margin:6px 0 2px}
 .sub{color:var(--mute);margin:0 0 16px}
 input{width:100%;font:inherit;padding:13px 16px;border-radius:10px;border:2px solid var(--line);background:var(--card);color:var(--ink)}
@@ -32,6 +32,16 @@ h3{margin:0 0 10px;font-size:.95rem;font-weight:600;padding-bottom:6px;border-bo
 .row .pc{text-align:right;color:var(--mute);font-size:.82rem}
 .row img{width:24px;height:24px;image-rendering:pixelated}
 .ci{width:22px;height:22px;flex:none}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:14px;align-items:start}
+.layout aside{position:sticky;top:12px;margin-bottom:0}
+@media(max-width:900px){.layout{grid-template-columns:1fr}.layout aside{position:static}}
+.ev{display:block;white-space:normal;color:var(--mute);font-size:.78rem;line-height:1.35}
+.mate{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;border-bottom:1px solid var(--line);padding:4px 2px;color:var(--ink);font:inherit;font-size:.88rem;cursor:pointer;text-align:left}
+.mate:last-child{border-bottom:0}
+.mate:hover{background:var(--card2)}
+.mate img,.mate .ph{width:48px;height:48px;flex:none;image-rendering:pixelated}
+.mate .mn{flex:1;min-width:0}
+.mate small{color:var(--mute)}
 .chip{border:1px solid var(--line);background:var(--card2);color:var(--ink);border-radius:99px;padding:5px 12px;font:inherit;font-size:.85rem;cursor:pointer;margin:0 6px 6px 0}
 .chip small{color:var(--mute);margin-left:4px}
 .mute{color:var(--mute);font-size:.85rem}
@@ -77,6 +87,7 @@ const enName = (o, fb) => ((o.names || []).find(n => n.language.name === "en") |
 const idx = {};
 const index = kind => idx[kind] || (idx[kind] = j(`${POKEAPI}/${kind}?limit=3000`).then(d => Object.fromEntries(d.results.map(r => [norm(r.name), r.name]))).catch(() => { delete idx[kind]; return {}; }));
 
+const sprite = async name => { const sl = slug(name); for (const id of [sl, sl.split("-")[0]]) { try { return (await j(`${POKEAPI}/pokemon/${id}`)).sprites.front_default || ""; } catch (e) {} } return ""; };
 let mon = null, mode = "vgc";
 
 /* ---------- Dados competitivos ---------- */
@@ -116,17 +127,21 @@ async function competitive(kind) {
   const aRows = abils.map((a, x) => { const r = ad[x]; return line(`<b>${esc(r ? enName(r.o, pretty(r.s)) : cap(a.k))}</b>`, a.share); }).join("") || none;
   const sRows = L("Spreads", 4).map(x => {
     const [nat, ev] = x.k.split(":"), v = (ev || "").split("/").map(Number);
-    return line(`<b>${esc(nat)} · ${v.map((q, i) => q ? q + " " + NS[i] : "").filter(Boolean).join(" / ")}</b>`, x.share);
+    const evs = v.map((q, i) => q ? q + " " + NS[i] : "").filter(Boolean).join(" / ");
+    return line(`<span style="display:block;min-width:0"><b>${esc(nat)}</b><span class="ev">${esc(evs)}</span></span>`, x.share);
   }).join("") || none;
-  const mates = L("Teammates", 10).map(x => `<button class="chip" data-n="${esc(x.k)}">${esc(x.k)}<small>${pct(x.share)}</small></button>`).join("") || none;
-  return `<p class="mute">Fonte: estatísticas do Smogon, formato ${esc(format)}.</p>
+  const mateList = L("Teammates", 10);
+  const sprites = await Promise.all(mateList.map(x => sprite(x.k)));
+  const mates = mateList.map((x, i) => `<button class="mate" data-n="${esc(x.k)}">${sprites[i] ? `<img src="${sprites[i]}" alt="">` : '<i class="ph"></i>'}<span class="mn">${esc(x.k)}</span><small>${pct(x.share)}</small></button>`).join("") || none;
+  return `<div class="layout"><div>
+  <p class="mute">Fonte: estatísticas do Smogon, formato ${esc(format)}.</p>
   <div class="grid">
    <div class="card"><h3>Golpes</h3>${mRows}</div>
    <div class="card"><h3>Itens</h3>${iRows}</div>
    <div class="card"><h3>Habilidades</h3>${aRows}</div>
    <div class="card"><h3>Natureza e EVs</h3>${sRows}</div>
-  </div>
-  <div class="card"><h3>Companheiros de time</h3>${mates}</div>`;
+  </div></div>
+  <aside class="card"><h3>Companheiros de time</h3>${mates}</aside></div>`;
 }
 
 /* ---------- Modo casual (calculado com a PokéAPI) ---------- */
