@@ -45,13 +45,8 @@ a{color:var(--acc)}
 </main>
 <script>
 /* ============ CONFIGURAÇÃO (ajuste aqui) ============ */
-// Estatísticas competitivas: JSON do projeto @pkmn (dados do Smogon), servido pelo GitHub Pages.
-const STATS_URL = f => `https://pkmn.github.io/smogon/data/stats/${f}.json`;
-// Formatos tentados em ordem. O primeiro que carregar é usado.
-const FORMATS = {
-  vgc:     ["gen9vgc2026regf", "gen9vgc2025regj", "gen9vgc2025regi", "gen9vgc2025regg"],
-  singles: ["gen9ou"]
-};
+// Estatísticas competitivas: arquivos gerados pelo workflow do GitHub (pasta data/).
+const STATS_FILE = k => `data/${k}.json`;
 const POKEAPI = "https://pokeapi.co/api/v2";
 const GAME = "scarlet-violet";   // jogo usado para sugerir golpes no modo casual
 /* ==================================================== */
@@ -71,18 +66,14 @@ let mon = null, mode = "vgc", names = [];
 const pick = (o, ...ks) => { for (const k of ks) if (o && o[k]) return o[k]; return {}; };
 const topN = (o, n) => { const e = Object.entries(o).filter(([k]) => k && k !== "Nothing" && k !== "nothing").sort((a,b) => b[1]-a[1]); const s = e.reduce((t,x) => t + x[1], 0) || 1; const m = e[0] ? e[0][1] : 1; return e.slice(0,n).map(([k,v]) => ({k, share: v/s, rel: v/m})); };
 
+const norm = s => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 async function loadStats(kind, name) {
-  let lastErr = "formato não encontrado";
-  for (const f of FORMATS[kind]) {
-    try {
-      const raw = await j(STATS_URL(f));
-      const all = raw.pokemon || raw.data || raw;
-      const key = Object.keys(all).find(k => k.toLowerCase() === name.toLowerCase());
-      if (!key) { lastErr = "sem dados deste Pokémon em " + f; continue; }
-      return { format: f, d: all[key] };
-    } catch (e) { lastErr = "não consegui carregar " + f; }
-  }
-  throw new Error(lastErr);
+  let raw;
+  try { raw = await j(STATS_FILE(kind)); }
+  catch (e) { throw new Error("o arquivo data/" + kind + ".json ainda não existe"); }
+  const key = Object.keys(raw.data).find(k => norm(k) === norm(name));
+  if (!key) throw new Error("sem dados deste Pokémon em " + raw.format);
+  return { format: raw.format + ", " + raw.month, d: raw.data[key] };
 }
 
 function rows(list, showPct) {
