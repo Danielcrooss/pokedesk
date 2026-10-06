@@ -123,6 +123,47 @@ def strategies():
         json.dump(out, fh, ensure_ascii=False, separators=(",", ":"))
 
 
+RAND_STATS = "https://pkmn.github.io/randbats/data/stats/gen9randombattle.json"
+RAND_SETS = "https://pkmn.github.io/randbats/data/gen9randombattle.json"
+
+
+def top_keys(d, n):
+    if isinstance(d, dict):
+        ranked = sorted(d.items(), key=lambda x: -(x[1] if isinstance(x[1], (int, float)) else 0))
+        return [str(k) for k, _ in ranked[:n]]
+    if isinstance(d, list):
+        return [str(x) for x in d[:n]]
+    return []
+
+
+def casual_data():
+    """Papeis do Random Battle (golpes, habilidades, itens, Tera) para a aba Casual."""
+    out = {}
+    try:
+        for name, p in json.loads(get(RAND_STATS)).items():
+            roles = p.get("roles")
+            if not isinstance(roles, dict):
+                continue
+            lst = [{"role": role, "abilities": top_keys(r.get("abilities", {}), 3),
+                    "items": top_keys(r.get("items", {}), 3), "tera": top_keys(r.get("teraTypes", {}), 3),
+                    "moves": top_keys(r.get("moves", {}), 8)}
+                   for role, r in roles.items() if isinstance(r, dict)]
+            if lst:
+                out[name] = {"level": p.get("level"), "roles": lst}
+    except Exception as e:
+        print(f"casual (stats): erro {e}", file=sys.stderr)
+    if not out:
+        for name, p in json.loads(get(RAND_SETS)).items():
+            lst = [{"role": s.get("role", ""), "abilities": top_keys(s.get("abilities", []), 3), "items": [],
+                    "tera": top_keys(s.get("teraTypes", []), 3), "moves": top_keys(s.get("movepool", []), 10)}
+                   for s in (p.get("sets") or [])]
+            if lst:
+                out[name] = {"level": p.get("level"), "roles": lst}
+    with open("data/casual.json", "w", encoding="utf-8") as fh:
+        json.dump(out, fh, ensure_ascii=False, separators=(",", ":"))
+    print(f"casual: {len(out)} pokemon")
+
+
 def main():
     os.makedirs("data", exist_ok=True)
     ok = 0
@@ -143,6 +184,10 @@ def main():
                 break
             except Exception as e:
                 print(f"{kind} {month}: erro {e}", file=sys.stderr)
+    try:
+        casual_data()
+    except Exception as e:
+        print(f"casual: erro {e}", file=sys.stderr)
     try:
         strategies()
     except Exception as e:
