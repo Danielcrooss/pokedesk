@@ -46,6 +46,7 @@ h4{margin:14px 0 8px;font-size:.85rem;font-weight:600;color:var(--acc)}
 .set{border-left:3px solid var(--acc);padding-left:10px;margin:0 0 12px;font-size:.9rem}
 .set b{display:block;font-weight:600}
 .set span{display:block;font-size:.82rem;color:var(--mute);line-height:1.45}
+.evo{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:6px 0}
 .chip{border:1px solid var(--line);background:var(--card2);color:var(--ink);border-radius:99px;padding:5px 12px;font:inherit;font-size:.85rem;cursor:pointer;margin:0 6px 6px 0}
 .chip small{color:var(--mute);margin-left:4px}
 .mute{color:var(--mute);font-size:.85rem}
@@ -163,28 +164,87 @@ async function competitive(kind) {
 }
 
 /* ---------- Modo casual (calculado com a PokéAPI) ---------- */
+const NAT = { "phys": ["Adamant", "+Atq −SpA"], "phys-fast": ["Jolly", "+Vel −SpA"], "spec": ["Modest", "+SpA −Atq"], "spec-fast": ["Timid", "+Vel −Atq"] };
+const TYPE_ITEM = { normal: "silk-scarf", fire: "charcoal", water: "mystic-water", electric: "magnet", grass: "miracle-seed", ice: "never-melt-ice", fighting: "black-belt", poison: "poison-barb", ground: "soft-sand", flying: "sharp-beak", psychic: "twisted-spoon", bug: "silver-powder", rock: "hard-stone", ghost: "spell-tag", dragon: "dragon-fang", dark: "black-glasses", steel: "metal-coat", fairy: "fairy-feather" };
+
+async function evolution() {
+  const sp = await j(mon.species.url), ch = await j(sp.evolution_chain.url);
+  const cond = d => { const x = (d || [])[0]; if (!x) return ""; const p = [];
+    if (x.min_level) p.push("Lv " + x.min_level);
+    if (x.item) p.push(pretty(x.item.name));
+    if (x.held_item) p.push("segurando " + pretty(x.held_item.name));
+    if (x.min_happiness) p.push("amizade");
+    if (x.known_move) p.push("sabendo " + pretty(x.known_move.name));
+    if (x.time_of_day) p.push(x.time_of_day === "day" ? "de dia" : "de noite");
+    if (x.trigger && x.trigger.name === "trade") p.push("troca");
+    if (!p.length && x.trigger) p.push(pretty(x.trigger.name));
+    return p.join(", "); };
+  const paths = [];
+  const walk = (n, acc) => { const me = { name: n.species.name, id: n.species.url.split("/").filter(Boolean).pop(), c: cond(n.evolution_details) }; const a = [...acc, me]; if (!n.evolves_to.length) paths.push(a); else n.evolves_to.forEach(k => walk(k, a)); };
+  walk(ch.chain, []);
+  if (paths.length === 1 && paths[0].length === 1) return '<p class="mute" style="margin:0">Este Pokémon não evolui.</p>';
+  return paths.slice(0, 6).map(p => `<div class="evo">${p.map((e, i) => `${i ? `<span class="mute">→ ${esc(e.c)}</span>` : ""}<button class="chip" data-n="${esc(e.name)}"><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${e.id}.png" alt="" style="width:32px;height:32px;image-rendering:pixelated;vertical-align:middle"> ${esc(pretty(e.name))}</button>`).join("")}</div>`).join("");
+}
+
 async function casual() {
-  const types = mon.types.map(t => t.type.name);
-  const best = mon.stats[1].base_stat >= mon.stats[3].base_stat ? "physical" : "special";
-  const learn = mon.moves.filter(m => m.version_group_details.some(v => v.version_group.name === GAME && v.move_learn_method.name === "level-up")).slice(0, 40);
-  const mv = (await Promise.all(learn.map(m => j(m.move.url).catch(() => null)))).filter(x => x && x.power);
-  const score = m => m.power * (types.includes(m.type.name) ? 1.5 : 1) * (m.damage_class.name === best ? 1 : .6) * (m.accuracy ? m.accuracy / 100 : 1);
-  mv.sort((a, b) => score(b) - score(a));
+  const types = mon.types.map(t => t.type.name), sp = mon.stats.map(s => s.base_stat);
+  const phys = sp[1] >= sp[3], fast = sp[5] >= 90, best = phys ? "physical" : "special";
+  const [nat, natTxt] = NAT[(phys ? "phys" : "spec") + (fast ? "-fast" : "")];
+  const evs = fast ? (phys ? "252 Atq / 252 Vel / 4 PS" : "252 SpA / 252 Vel / 4 PS") : (phys ? "252 PS / 252 Atq / 4 Def" : "252 PS / 252 SpA / 4 SpD");
+
+  const cand = mon.moves.map(m => {
+    const d = m.version_group_details.filter(v => v.version_group.name === GAME);
+    const lv = d.find(v => v.move_learn_method.name === "level-up"), tm = d.find(v => v.move_learn_method.name === "machine");
+    return lv || tm ? { url: m.move.url, how: lv ? "Lv " + (lv.level_learned_at || 1) : "TM" } : null;
+  }).filter(Boolean).slice(0, 100);
+  const mvs = (await Promise.all(cand.map(c => j(c.url).then(o => ({ o, how: c.how })).catch(() => null)))).filter(x => x && x.o.power);
+  const score = x => x.o.power * (types.includes(x.o.type.name) ? 1.5 : 1) * (x.o.damage_class.name === best ? 1 : .6) * (x.o.accuracy ? x.o.accuracy / 100 : 1);
+  mvs.sort((a, b) => score(b) - score(a));
   const chosen = [], used = new Set();
-  for (const m of mv) { if (chosen.length >= 4) break; if (!used.has(m.type.name) || chosen.length >= 2) { chosen.push(m); used.add(m.type.name); } }
+  for (const x of mvs) { if (chosen.length >= 4) break; if (!used.has(x.o.type.name) || chosen.length >= 2) { chosen.push(x); used.add(x.o.type.name); } }
+  const itemSlug = TYPE_ITEM[chosen[0] ? chosen[0].o.type.name : types[0]];
+
+  const ab = await Promise.all(mon.abilities.map(a => j(a.ability.url).catch(() => null)));
+  const abHtml = mon.abilities.map((a, i) => { const o = ab[i], eff = o && (o.effect_entries.find(e => e.language.name === "en") || {}).short_effect; return `<div style="margin:0 0 8px"><b>${esc(o ? enName(o, pretty(a.ability.name)) : pretty(a.ability.name))}</b>${a.is_hidden ? ' <span class="mute">(oculta)</span>' : ""}${eff ? `<span class="ev">${esc(eff)}</span>` : ""}</div>`; }).join("");
+
   const rel = await Promise.all(types.map(t => j(`${POKEAPI}/type/${t}`)));
   const mult = {};
   rel.forEach(r => { r.damage_relations.double_damage_from.forEach(x => mult[x.name] = (mult[x.name] || 1) * 2); r.damage_relations.half_damage_from.forEach(x => mult[x.name] = (mult[x.name] || 1) * .5); r.damage_relations.no_damage_from.forEach(x => mult[x.name] = 0); });
   const weak = Object.keys(mult).filter(t => mult[t] > 1);
   const tr = await Promise.all(Object.keys(TC).map(t => j(`${POKEAPI}/type/${t}`)));
   const cover = tr.filter(t => { const half = [...t.damage_relations.half_damage_from, ...t.damage_relations.no_damage_from].map(x => x.name); return weak.length && weak.filter(w => half.includes(w)).length >= Math.max(1, weak.length - 1); }).map(t => t.name);
-  const abil = mon.abilities.map(a => pretty(a.ability.name) + (a.is_hidden ? " (oculta)" : ""));
-  return `<p class="mute">Sugestão automática a partir dos golpes que ele aprende por nível em ${esc(pretty(GAME))}. Não vem de estatísticas de jogadores.</p>
-  <div class="grid">
-   <div class="card"><h3>Golpes sugeridos</h3>${chosen.map(m => `<div class="row" style="grid-template-columns:1fr auto"><span class="nm">${badge(m.type.name)}${cls(m.damage_class.name)}<b>${esc(enName(m, pretty(m.name)))}</b></span><span class="pc">poder ${m.power}</span></div>`).join("") || none}</div>
-   <div class="card"><h3>Habilidades</h3><p style="margin:0">${abil.map(esc).join("<br>")}</p><h3 style="margin-top:14px">Fraco contra</h3><div>${weak.map(t => badge(t) + '<span class="mute">×' + mult[t] + '</span> ').join("") || "Nada"}</div></div>
+
+  const lv = mon.moves.map(m => { const d = m.version_group_details.find(v => v.version_group.name === GAME && v.move_learn_method.name === "level-up"); return d ? [d.level_learned_at, m.move.name] : null; }).filter(Boolean).sort((a, b) => a[0] - b[0]);
+
+  let roles = "";
+  try {
+    const raw = await j("data/casual.json"), key = Object.keys(raw).find(k => norm(k) === norm(pretty(mon.name)));
+    if (key) {
+      const [mi, ii, ai] = await Promise.all([index("move"), index("item"), index("ability")]);
+      const nm = (map, k) => map[norm(k)] ? pretty(map[norm(k)]) : k;
+      roles = `<div class="card"><h3>Papéis sugeridos (Random Battle)</h3><p class="mute" style="margin:0 0 8px">Sets do Pokémon Showdown para batalhas equilibradas${raw[key].level ? ", nível " + raw[key].level : ""}. Boas ideias de função, mas não são específicos da história.</p>${raw[key].roles.map(r => `<div class="set"><b>${esc(r.role)}</b>
+        <span>Habilidades: ${r.abilities.map(a => esc(nm(ai, a))).join(", ") || "—"}</span>${r.items.length ? `<span>Itens: ${r.items.map(i => esc(nm(ii, i))).join(", ")}</span>` : ""}${r.tera.length ? `<span>Tera: ${r.tera.map(esc).join(", ")}</span>` : ""}
+        <span>Golpes: ${r.moves.map(m => esc(nm(mi, m))).join(", ")}</span></div>`).join("")}</div>`;
+    }
+  } catch (e) {}
+
+  const evo = await evolution().catch(() => "");
+  return `<p class="mute">Sugestão automática com dados da PokéAPI (golpes de ${esc(pretty(GAME))}) e sets do Random Battle. Não existe API pública de builds para a história, então use como ponto de partida.</p>
+  <div class="layout"><div>
+   <div class="grid">
+    <div class="card"><h3>Build sugerida</h3>
+     <div class="row" style="grid-template-columns:1fr"><span class="nm"><b>Natureza: ${nat}</b></span></div><span class="ev">${natTxt}</span>
+     <div class="row" style="grid-template-columns:1fr;margin-top:10px"><span class="nm"><b>EVs: ${evs}</b></span></div>
+     ${itemSlug ? `<div class="row" style="grid-template-columns:1fr;margin-top:10px"><span class="nm"><img src="${ITEM_IMG(itemSlug)}" alt="" onerror="this.style.visibility='hidden'"><b>Item: ${esc(pretty(itemSlug))}</b></span></div>` : ""}
+    </div>
+    <div class="card"><h3>Golpes sugeridos</h3>${chosen.map(x => `<div class="row" style="grid-template-columns:1fr auto"><span class="nm">${badge(x.o.type.name)}${cls(x.o.damage_class.name)}<b>${esc(enName(x.o, pretty(x.o.name)))}</b></span><span class="pc">${x.how} · ${x.o.power}</span></div>`).join("") || none}</div>
+    <div class="card"><h3>Habilidades</h3>${abHtml}</div>
+    <div class="card"><h3>Evolução</h3>${evo || none}</div>
+   </div>
+   ${roles}
+   <div class="card"><details><summary style="cursor:pointer;color:var(--acc)">Todos os golpes por nível</summary>${lv.map(([l, n]) => `<div class="mute">Lv ${l || "—"} · ${esc(pretty(n))}</div>`).join("") || none}</details></div>
   </div>
-  <div class="card"><h3>Tipos que cobrem suas fraquezas</h3><div>${cover.map(badge).join("") || "—"}</div></div>`;
+  <aside class="card"><h3>Fraco contra</h3><div>${weak.map(t => badge(t) + '<span class="mute">×' + mult[t] + '</span> ').join("") || "Nada"}</div><h3 style="margin-top:14px">Tipos que cobrem as fraquezas</h3><div>${cover.map(badge).join("") || "—"}</div></aside></div>`;
 }
 
 /* ---------- Tela ---------- */
