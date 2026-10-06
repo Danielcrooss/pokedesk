@@ -97,7 +97,7 @@ async function strategies(kind, name) {
   let raw; try { raw = await j("data/strategies.json"); } catch (e) { return ""; }
   const grp = raw[kind === "singles" ? "singles" : "vgcsv"] || {};
   const key = Object.keys(grp).find(k => norm(k) === norm(name));
-  const note = kind === "vgc" ? '<p class="mute">O Smogon não publica estratégias para o Champions. Estes são os sets de Scarlet/Violet, como referência: golpes e itens podem não existir no Champions.</p>' : "";
+  const note = kind === "vgc" ? '<p class="mute">O Smogon não publica estratégias para o Champions. Estes são os sets de Scarlet/Violet, como referência: golpes e itens podem não existir no Champions, e os EVs deles (até 252) usam outra escala que os pontos de status.</p>' : "";
   const link = `<p class="mute" style="margin-bottom:0">Análise completa no <a href="https://www.smogon.com/dex/sv/pokemon/${slug(name)}/" target="_blank" rel="noopener">Smogon Strategy Dex</a>.</p>`;
   if (!key) return `<div class="card"><h3>Estratégias (Smogon)</h3>${note}<p class="mute">Sem sets do Smogon para este Pokémon neste formato.</p>${link}</div>`;
   const body = grp[key].map(g => `<h4>${esc(fmtName(g.format))}</h4>` + g.sets.map(s => `<div class="set"><b>${esc(s.name)}</b>
@@ -157,7 +157,7 @@ async function competitive(kind) {
    <div class="card"><h3>Golpes</h3>${mRows}</div>
    <div class="card"><h3>Itens</h3>${iRows}</div>
    <div class="card"><h3>Habilidades</h3>${aRows}</div>
-   <div class="card"><h3>Natureza e EVs</h3>${sRows}</div>
+   <div class="card"><h3>${kind === "vgc" ? "Natureza e pontos de status" : "Natureza e EVs"}</h3>${kind === "vgc" ? '<p class="mute" style="margin:0 0 6px">No Champions não há EVs: cada status recebe até 32 pontos, somando no máximo 66.</p>' : ""}${sRows}</div>
   </div>${strat}</div>
   <aside class="card"><h3>Companheiros de time</h3>${mates}</aside></div>`;
 }
