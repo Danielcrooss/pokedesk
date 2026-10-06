@@ -4,98 +4,113 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Buscador de builds Pokémon</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
 <style>
-:root{--bg:#f2f5fa;--card:#fff;--ink:#17203a;--mute:#5b6786;--line:#d9e0ee;--acc:#d62f3a;--accink:#fff}
-@media (prefers-color-scheme:dark){:root{--bg:#10162a;--card:#19213a;--ink:#eef2fb;--mute:#9aa6c4;--line:#2a3558;--acc:#ff5560;--accink:#10162a}}
+:root{--bg:#10131c;--card:#1a1e2b;--card2:#222737;--ink:#eef1f8;--mute:#8d96b0;--line:#2c3246;--acc:#4da3ff;--accink:#08111f}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
-main{max-width:780px;margin:0 auto;padding:20px 16px 48px}
-h1{font-size:2rem;margin:8px 0 4px;letter-spacing:-.02em}
-.sub{color:var(--mute);margin:0 0 18px}
-input{width:100%;font:inherit;padding:14px 16px;border-radius:12px;border:2px solid var(--line);background:var(--card);color:var(--ink)}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.5 "Poppins",system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:860px;margin:0 auto;padding:20px 14px 48px}
+h1{font-size:1.7rem;font-weight:700;margin:6px 0 2px}
+.sub{color:var(--mute);margin:0 0 16px}
+input{width:100%;font:inherit;padding:13px 16px;border-radius:10px;border:2px solid var(--line);background:var(--card);color:var(--ink)}
 input:focus-visible,button:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px}
 .head{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
-.head img{width:96px;height:96px;image-rendering:pixelated}
-.head h2{margin:0;font-size:1.6rem}
-.t{display:inline-block;padding:2px 10px;border-radius:6px;font-size:.85rem;font-weight:600;color:#fff;margin-right:6px;background:#667}
-.stat{display:grid;grid-template-columns:44px 1fr 34px;gap:8px;align-items:center;font-size:.85rem;margin-top:5px}
-.bar{height:8px;background:var(--line);border-radius:4px;overflow:hidden}.bar i{display:block;height:100%;background:var(--acc)}
-.tabs{display:flex;gap:6px;margin:18px 0 12px}
-.tab{flex:1;padding:10px 6px;border-radius:10px;border:2px solid var(--line);background:var(--card);color:var(--ink);font:600 1rem system-ui,sans-serif;cursor:pointer}
+.head img{width:96px;height:96px}
+.head h2{margin:0 0 4px;font-size:1.5rem;font-weight:700}
+.tp{display:inline-block;min-width:64px;text-align:center;padding:1px 10px;border-radius:5px;font-size:.78rem;font-weight:600;color:#fff;background:#667;margin-right:6px;text-shadow:0 1px 1px rgba(0,0,0,.35)}
+.stat{display:grid;grid-template-columns:40px 1fr 34px;gap:8px;align-items:center;font-size:.82rem;margin-top:4px}
+.bar{height:8px;background:var(--card2);border-radius:4px;overflow:hidden}.bar i{display:block;height:100%;background:var(--acc);border-radius:4px}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin:16px 0 12px}
+.tab{flex:1 1 120px;padding:9px 6px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--mute);font:600 .9rem "Poppins",system-ui,sans-serif;cursor:pointer}
 .tab[aria-selected="true"]{background:var(--acc);border-color:var(--acc);color:var(--accink)}
-h3{margin:0 0 8px;font-size:1.05rem}
-.row{display:grid;grid-template-columns:minmax(110px,40%) 1fr 48px;gap:8px;align-items:center;font-size:.92rem;margin:4px 0}
-.row span:last-child{text-align:right;color:var(--mute)}
-.chip{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:99px;padding:6px 14px;font:inherit;cursor:pointer;margin:0 6px 6px 0}
-.mute{color:var(--mute);font-size:.9rem}
+h3{margin:0 0 10px;font-size:.95rem;font-weight:600;padding-bottom:6px;border-bottom:1px solid var(--line)}
+.row{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(40px,1fr) 46px;gap:8px;align-items:center;margin:6px 0;font-size:.88rem}
+.row .nm{display:flex;align-items:center;gap:8px;min-width:0}
+.row .nm b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .pc{text-align:right;color:var(--mute);font-size:.82rem}
+.row img{width:24px;height:24px;image-rendering:pixelated}
+.chip{border:1px solid var(--line);background:var(--card2);color:var(--ink);border-radius:99px;padding:5px 12px;font:inherit;font-size:.85rem;cursor:pointer;margin:0 6px 6px 0}
+.chip small{color:var(--mute);margin-left:4px}
+.mute{color:var(--mute);font-size:.85rem}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-@media(max-width:600px){.grid{grid-template-columns:1fr}.row{grid-template-columns:100px 1fr 44px}}
+@media(max-width:640px){.grid{grid-template-columns:1fr}}
 a{color:var(--acc)}
 </style>
 </head>
 <body>
 <main>
 <h1>Buscador de builds Pokémon</h1>
-<p class="sub">Digite o nome, escolha o formato e veja builds, golpes, itens e companheiros de time.</p>
+<p class="sub">Digite o nome, escolha o formato e veja golpes, itens, natureza e companheiros de time.</p>
 <input id="q" list="names" placeholder="Ex.: Garchomp" aria-label="Nome do Pokémon" autocomplete="off">
 <datalist id="names"></datalist>
 <div id="out"></div>
 <p class="mute" id="foot"></p>
 </main>
 <script>
-/* ============ CONFIGURAÇÃO (ajuste aqui) ============ */
-// Estatísticas competitivas: arquivos gerados pelo workflow do GitHub (pasta data/).
 const STATS_FILE = k => `data/${k}.json`;
 const POKEAPI = "https://pokeapi.co/api/v2";
-const GAME = "scarlet-violet";   // jogo usado para sugerir golpes no modo casual
-/* ==================================================== */
+const ITEM_IMG = n => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${n}.png`;
+const GAME = "scarlet-violet";
 
 const NS = ["PS","Atq","Def","SpA","SpD","Vel"];
-const TC = {normal:"#8a8a7a",fire:"#e2562a",water:"#3f7fd6",electric:"#d9a900",grass:"#4a9e3f",ice:"#4fb5c9",fighting:"#b0392e",poison:"#8e4aa8",ground:"#b8893a",flying:"#6b8fd6",psychic:"#d6558a",bug:"#8a9a1f",rock:"#8f7d3a",ghost:"#6a4c93",dragon:"#5b4fd0",dark:"#4a3f3a",steel:"#6f8fa3",fairy:"#d4649a"};
-const MODES = [["vgc","VGC (Doubles)"],["singles","Singles"],["casual","Casual"]];
+const TC = {normal:"#9fa19f",fire:"#e8622a",water:"#4592e6",electric:"#e8b800",grass:"#3fa129",ice:"#3dcef3",fighting:"#d3425f",poison:"#9f5bd0",ground:"#a97a4a",flying:"#7fa4e8",psychic:"#ee6b7a",bug:"#8fa31b",rock:"#b8a86e",ghost:"#6c5aa8",dragon:"#4f60e2",dark:"#5b5466",steel:"#5a8ea5",fairy:"#ee90e6"};
+const MODES = [["vgc","VGC Champions"],["vgcsv","VGC Scarlet/Violet"],["singles","Singles"],["casual","Casual"]];
 const $ = id => document.getElementById(id);
 const cache = new Map();
 const j = async u => { if (cache.has(u)) return cache.get(u); const r = await fetch(u); if (!r.ok) throw new Error(r.status); const d = await r.json(); cache.set(u, d); return d; };
 const pretty = s => s.split("-").map(w => w[0].toUpperCase() + w.slice(1)).join(" ");
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const slug = s => s.toLowerCase().replace(/['’.]/g, "").replace(/\s+/g, "-");
+const norm = s => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+const badge = t => `<span class="tp" style="${TC[t] ? "background:" + TC[t] : ""}">${t ? esc(pretty(t)) : "?"}</span>`;
 
-let mon = null, mode = "vgc", names = [];
+let mon = null, mode = "vgc";
 
 /* ---------- Dados competitivos ---------- */
 const pick = (o, ...ks) => { for (const k of ks) if (o && o[k]) return o[k]; return {}; };
-const topN = (o, n) => { const e = Object.entries(o).filter(([k]) => k && k !== "Nothing" && k !== "nothing").sort((a,b) => b[1]-a[1]); const s = e.reduce((t,x) => t + x[1], 0) || 1; const m = e[0] ? e[0][1] : 1; return e.slice(0,n).map(([k,v]) => ({k, share: v/s, rel: v/m})); };
+const topN = (o, c, n) => {
+  const e = Object.entries(o).filter(([k, v]) => k && k.toLowerCase() !== "nothing" && v > 0).sort((a, b) => b[1] - a[1]);
+  const s = e.reduce((t, x) => t + x[1], 0) || 1;
+  return e.slice(0, c).map(([k, v]) => ({ k, share: Math.min(1, v / (n || s)) }));
+};
 
-const norm = s => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 async function loadStats(kind, name) {
   let raw;
   try { raw = await j(STATS_FILE(kind)); }
   catch (e) { throw new Error("o arquivo data/" + kind + ".json ainda não existe"); }
   const key = Object.keys(raw.data).find(k => norm(k) === norm(name));
-  if (!key) throw new Error("sem dados deste Pokémon em " + raw.format);
+  if (!key) throw new Error("sem dados deste Pokémon em " + raw.format + ", " + raw.month);
   return { format: raw.format + ", " + raw.month, d: raw.data[key] };
 }
 
-function rows(list, showPct) {
-  return list.map(x => `<div class="row"><span>${esc(x.k)}</span><div class="bar"><i style="width:${Math.round(x.rel*100)}%"></i></div><span>${showPct ? Math.round(x.share*100)+"%" : ""}</span></div>`).join("") || '<p class="mute">Sem dados.</p>';
-}
-
-function spreadRows(sp) {
-  const l = topN(sp, 4).map(x => { const [nat, ev] = x.k.split(":"); const v = (ev||"").split("/").map(Number); const txt = v.map((n,i) => n ? n+" "+NS[i] : "").filter(Boolean).join(" / "); return {k: nat + " · " + txt, share: x.share, rel: x.rel}; });
-  return rows(l, true);
-}
+const pct = x => Math.round(x * 100) + "%";
+const line = (nm, share) => `<div class="row"><span class="nm">${nm}</span><div class="bar"><i style="width:${Math.round(share * 100)}%"></i></div><span class="pc">${pct(share)}</span></div>`;
+const none = '<p class="mute">Sem dados.</p>';
 
 async function competitive(kind) {
-  const {format, d} = await loadStats(kind, pretty(mon.name));
-  const mates = topN(pick(d, "teammates", "Teammates"), 8);
+  const { format, d } = await loadStats(kind, pretty(mon.name));
+  const n = d.n, L = (key, c) => topN(pick(d, key, key.toLowerCase()), c, n);
+  const moves = L("Moves", 8), items = L("Items", 6);
+  const mt = {};
+  await Promise.all(moves.map(async m => { try { mt[m.k] = (await j(`${POKEAPI}/move/${slug(m.k)}`)).type.name; } catch (e) {} }));
+  const mRows = moves.map(m => line(`${badge(mt[m.k])}<b>${esc(m.k)}</b>`, m.share)).join("") || none;
+  const iRows = items.map(i => line(`<img src="${ITEM_IMG(slug(i.k))}" alt="" onerror="this.style.visibility='hidden'"><b>${esc(i.k)}</b>`, i.share)).join("") || none;
+  const aRows = L("Abilities", 3).map(a => line(`<b>${esc(a.k)}</b>`, a.share)).join("") || none;
+  const sRows = L("Spreads", 4).map(x => {
+    const [nat, ev] = x.k.split(":"), v = (ev || "").split("/").map(Number);
+    return line(`<b>${esc(nat)} · ${v.map((q, i) => q ? q + " " + NS[i] : "").filter(Boolean).join(" / ")}</b>`, x.share);
+  }).join("") || none;
+  const mates = L("Teammates", 10).map(x => `<button class="chip" data-n="${esc(x.k)}">${esc(x.k)}<small>${pct(x.share)}</small></button>`).join("") || none;
   return `<p class="mute">Fonte: estatísticas do Smogon, formato ${esc(format)}.</p>
   <div class="grid">
-   <div class="card"><h3>Golpes mais usados</h3>${rows(topN(pick(d,"moves","Moves"),8), false)}</div>
-   <div class="card"><h3>Itens</h3>${rows(topN(pick(d,"items","Items"),6), true)}</div>
-   <div class="card"><h3>Habilidades</h3>${rows(topN(pick(d,"abilities","Abilities"),3), true)}</div>
-   <div class="card"><h3>Natureza e EVs</h3>${spreadRows(pick(d,"spreads","Spreads"))}</div>
+   <div class="card"><h3>Golpes</h3>${mRows}</div>
+   <div class="card"><h3>Itens</h3>${iRows}</div>
+   <div class="card"><h3>Habilidades</h3>${aRows}</div>
+   <div class="card"><h3>Natureza e EVs</h3>${sRows}</div>
   </div>
-  <div class="card"><h3>Combina com</h3>${mates.map(x => `<button class="chip" data-n="${esc(x.k)}">${esc(x.k)}</button>`).join("") || '<p class="mute">Sem dados.</p>'}</div>`;
+  <div class="card"><h3>Companheiros de time</h3>${mates}</div>`;
 }
 
 /* ---------- Modo casual (calculado com a PokéAPI) ---------- */
@@ -104,38 +119,41 @@ async function casual() {
   const best = mon.stats[1].base_stat >= mon.stats[3].base_stat ? "physical" : "special";
   const learn = mon.moves.filter(m => m.version_group_details.some(v => v.version_group.name === GAME && v.move_learn_method.name === "level-up")).slice(0, 40);
   const mv = (await Promise.all(learn.map(m => j(m.move.url).catch(() => null)))).filter(x => x && x.power);
-  const score = m => m.power * (types.includes(m.type.name) ? 1.5 : 1) * (m.damage_class.name === best ? 1 : .6) * (m.accuracy ? m.accuracy/100 : 1);
-  mv.sort((a,b) => score(b) - score(a));
+  const score = m => m.power * (types.includes(m.type.name) ? 1.5 : 1) * (m.damage_class.name === best ? 1 : .6) * (m.accuracy ? m.accuracy / 100 : 1);
+  mv.sort((a, b) => score(b) - score(a));
   const chosen = [], used = new Set();
   for (const m of mv) { if (chosen.length >= 4) break; if (!used.has(m.type.name) || chosen.length >= 2) { chosen.push(m); used.add(m.type.name); } }
   const rel = await Promise.all(types.map(t => j(`${POKEAPI}/type/${t}`)));
   const mult = {};
-  rel.forEach(r => { r.damage_relations.double_damage_from.forEach(x => mult[x.name] = (mult[x.name]||1)*2); r.damage_relations.half_damage_from.forEach(x => mult[x.name] = (mult[x.name]||1)*.5); r.damage_relations.no_damage_from.forEach(x => mult[x.name] = 0); });
+  rel.forEach(r => { r.damage_relations.double_damage_from.forEach(x => mult[x.name] = (mult[x.name] || 1) * 2); r.damage_relations.half_damage_from.forEach(x => mult[x.name] = (mult[x.name] || 1) * .5); r.damage_relations.no_damage_from.forEach(x => mult[x.name] = 0); });
   const weak = Object.keys(mult).filter(t => mult[t] > 1);
   const tr = await Promise.all(Object.keys(TC).map(t => j(`${POKEAPI}/type/${t}`)));
-  const cover = tr.filter(t => { const half = [...t.damage_relations.half_damage_from, ...t.damage_relations.no_damage_from].map(x => x.name); return weak.length && weak.every(w => half.includes(w)) || weak.filter(w => half.includes(w)).length >= Math.max(1, weak.length - 1); }).map(t => t.name);
+  const cover = tr.filter(t => { const half = [...t.damage_relations.half_damage_from, ...t.damage_relations.no_damage_from].map(x => x.name); return weak.length && weak.filter(w => half.includes(w)).length >= Math.max(1, weak.length - 1); }).map(t => t.name);
   const abil = mon.abilities.map(a => pretty(a.ability.name) + (a.is_hidden ? " (oculta)" : ""));
   return `<p class="mute">Sugestão automática a partir dos golpes que ele aprende por nível em ${esc(pretty(GAME))}. Não vem de estatísticas de jogadores.</p>
   <div class="grid">
-   <div class="card"><h3>Golpes sugeridos</h3>${chosen.map(m => `<div class="row"><span>${esc(pretty(m.name))}</span><span class="mute" style="grid-column:span 2;text-align:left">${esc(pretty(m.type.name))} · poder ${m.power}</span></div>`).join("") || '<p class="mute">Sem golpes de ataque por nível neste jogo.</p>'}</div>
-   <div class="card"><h3>Habilidades</h3><p style="margin:0">${abil.map(esc).join("<br>")}</p><h3 style="margin-top:14px">Fraco contra</h3><p style="margin:0">${weak.map(t => pretty(t) + " ×" + mult[t]).join(", ") || "Nada"}</p></div>
+   <div class="card"><h3>Golpes sugeridos</h3>${chosen.map(m => `<div class="row" style="grid-template-columns:1fr auto"><span class="nm">${badge(m.type.name)}<b>${esc(pretty(m.name))}</b></span><span class="pc">poder ${m.power}</span></div>`).join("") || none}</div>
+   <div class="card"><h3>Habilidades</h3><p style="margin:0">${abil.map(esc).join("<br>")}</p><h3 style="margin-top:14px">Fraco contra</h3><div>${weak.map(t => badge(t) + '<span class="mute">×' + mult[t] + '</span> ').join("") || "Nada"}</div></div>
   </div>
-  <div class="card"><h3>Tipos que cobrem suas fraquezas</h3><p style="margin:0">${cover.map(pretty).join(", ") || "—"}</p></div>`;
+  <div class="card"><h3>Tipos que cobrem suas fraquezas</h3><div>${cover.map(badge).join("") || "—"}</div></div>`;
 }
 
 /* ---------- Tela ---------- */
 function shell() {
   const m = mon, img = m.sprites.other["official-artwork"].front_default || m.sprites.front_default;
-  return `<div class="card"><div class="head"><img src="${img}" alt="${esc(pretty(m.name))}"><div><h2>${esc(pretty(m.name))}</h2><div>${m.types.map(t => `<span class="t" style="background:${TC[t.type.name]}">${esc(pretty(t.type.name))}</span>`).join("")}</div></div></div>
-  ${m.stats.map((s,i) => `<div class="stat"><span>${NS[i]}</span><div class="bar"><i style="width:${Math.min(100, s.base_stat/1.6)}%"></i></div><b>${s.base_stat}</b></div>`).join("")}</div>
-  <div class="tabs" role="tablist">${MODES.map(x => `<button class="tab" role="tab" data-m="${x[0]}" aria-selected="${x[0]===mode}">${x[1]}</button>`).join("")}</div><div id="tab"></div>`;
+  return `<div class="card"><div class="head"><img src="${img}" alt="${esc(pretty(m.name))}"><div><h2>${esc(pretty(m.name))}</h2><div>${m.types.map(t => badge(t.type.name)).join("")}</div></div></div>
+  ${m.stats.map((s, i) => `<div class="stat"><span>${NS[i]}</span><div class="bar"><i style="width:${Math.min(100, s.base_stat / 1.6)}%"></i></div><b>${s.base_stat}</b></div>`).join("")}</div>
+  <div class="tabs" role="tablist">${MODES.map(x => `<button class="tab" role="tab" data-m="${x[0]}" aria-selected="${x[0] === mode}">${x[1]}</button>`).join("")}</div><div id="tab"></div>`;
 }
 
 async function renderTab() {
-  const t = $("tab"); t.innerHTML = '<p class="mute">Carregando…</p>';
-  try { t.innerHTML = mode === "casual" ? await casual() : await competitive(mode); }
-  catch (e) { t.innerHTML = `<div class="card">Não foi possível carregar os dados competitivos (${esc(e.message)}). Veja direto no <a href="https://www.pikalytics.com/pokedex/${mode==="vgc"?"gen9vgc2026regf":"gen9ou"}/${encodeURIComponent(pretty(mon.name))}" target="_blank" rel="noopener">Pikalytics</a>.</div>`; }
+  const t = $("tab"), my = ++renderTab.id; t.innerHTML = '<p class="mute">Carregando…</p>';
+  let html;
+  try { html = mode === "casual" ? await casual() : await competitive(mode); }
+  catch (e) { html = `<div class="card">Não foi possível carregar os dados competitivos (${esc(e.message)}). Veja direto no <a href="https://www.pikalytics.com/pokedex" target="_blank" rel="noopener">Pikalytics</a>.</div>`; }
+  if (my === renderTab.id) t.innerHTML = html;
 }
+renderTab.id = 0;
 
 async function show(raw) {
   const id = raw.trim().toLowerCase().replace(/\s+/g, "-");
@@ -155,9 +173,8 @@ document.addEventListener("click", e => {
 $("q").addEventListener("keydown", e => { if (e.key === "Enter") show($("q").value); });
 $("q").addEventListener("change", () => show($("q").value));
 
-j(`${POKEAPI}/pokemon?limit=1100`).then(d => { names = d.results.map(r => r.name); $("names").innerHTML = names.map(n => `<option value="${esc(pretty(n))}">`).join(""); }).catch(() => {});
+j(`${POKEAPI}/pokemon?limit=1100`).then(d => { $("names").innerHTML = d.results.map(r => `<option value="${esc(pretty(r.name))}">`).join(""); }).catch(() => {});
 $("foot").innerHTML = 'Dados: <a href="https://pokeapi.co" target="_blank" rel="noopener">PokéAPI</a> e estatísticas do <a href="https://www.smogon.com/stats/" target="_blank" rel="noopener">Smogon</a>.';
 </script>
 </body>
 </html>
-
