@@ -54,6 +54,75 @@ def trim(chaos):
     return out
 
 
+SETS_URL = "https://pkmn.github.io/smogon/data/sets/"
+STAT = {"hp": "PS", "atk": "Atq", "def": "Def", "spa": "SpA", "spd": "SpD", "spe": "Vel"}
+SINGLES_FORMATS = ["gen9ubers", "gen9ou", "gen9uu", "gen9ru", "gen9nu", "gen9pu", "gen9zu"]
+
+
+def txt(v):
+    if not v:
+        return ""
+    if isinstance(v, list):
+        return " / ".join(txt(x) for x in v if x)
+    return str(v)
+
+
+def evs_txt(v):
+    if not v:
+        return ""
+    if isinstance(v, list):
+        return "  ou  ".join(evs_txt(x) for x in v if x)
+    return " / ".join(f"{n} {STAT.get(k, k)}" for k, n in v.items() if n)
+
+
+def conv(name, s):
+    return {
+        "name": name,
+        "moves": [txt(m) for m in s.get("moves", [])],
+        "item": txt(s.get("item")),
+        "ability": txt(s.get("ability")),
+        "nature": txt(s.get("nature")),
+        "evs": evs_txt(s.get("evs")),
+        "tera": txt(s.get("teratypes") or s.get("teraTypes")),
+    }
+
+
+def reg_key(f):
+    m = re.search(r"(\d{4})reg([a-z]+)", f)
+    return m.groups() if m else (f,)
+
+
+def strategies():
+    """Sets do Smogon Strategy Dex (sem os textos de analise, que tem autoria propria)."""
+    index = json.loads(get(SETS_URL + "index.json"))
+    avail = [k for k in index if k.startswith("gen9") and k != "gen9"]
+    vgc = sorted([f for f in avail if re.match(r"^gen9vgc\d{4}reg[a-z]+$", f)], key=reg_key, reverse=True)[:2]
+    groups = {
+        "singles": [f for f in SINGLES_FORMATS if f in avail],
+        "vgcsv": vgc + [f for f in ["gen9doublesou"] if f in avail],
+    }
+    out = {}
+    for gname, fmts in groups.items():
+        res = {}
+        for f in fmts:
+            try:
+                data = json.loads(get(f"{SETS_URL}{f}.json"))
+            except Exception as e:
+                print(f"estrategias {f}: erro {e}", file=sys.stderr)
+                continue
+            for species, sets in data.items():
+                lst = []
+                for name, s in sets.items():
+                    for item in (s if isinstance(s, list) else [s]):
+                        lst.append(conv(name, item))
+                if lst:
+                    res.setdefault(species, []).append({"format": f, "sets": lst})
+        out[gname] = res
+        print(f"estrategias {gname}: {len(res)} pokemon em {fmts}")
+    with open("data/strategies.json", "w", encoding="utf-8") as fh:
+        json.dump(out, fh, ensure_ascii=False, separators=(",", ":"))
+
+
 def main():
     os.makedirs("data", exist_ok=True)
     ok = 0
@@ -74,6 +143,10 @@ def main():
                 break
             except Exception as e:
                 print(f"{kind} {month}: erro {e}", file=sys.stderr)
+    try:
+        strategies()
+    except Exception as e:
+        print(f"estrategias: erro {e}", file=sys.stderr)
     if ok == 0:
         sys.exit("Nenhum arquivo gerado")
 
