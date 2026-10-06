@@ -31,11 +31,12 @@ h3{margin:0 0 10px;font-size:.95rem;font-weight:600;padding-bottom:6px;border-bo
 .row .nm b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .row .pc{text-align:right;color:var(--mute);font-size:.82rem}
 .row img{width:24px;height:24px;image-rendering:pixelated}
+.ci{width:22px;height:22px;flex:none}
 .chip{border:1px solid var(--line);background:var(--card2);color:var(--ink);border-radius:99px;padding:5px 12px;font:inherit;font-size:.85rem;cursor:pointer;margin:0 6px 6px 0}
 .chip small{color:var(--mute);margin-left:4px}
 .mute{color:var(--mute);font-size:.85rem}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-@media(max-width:640px){.grid{grid-template-columns:1fr}}
+@media(max-width:640px){.grid{grid-template-columns:1fr}.row .nm b{white-space:normal}.tp{min-width:54px;font-size:.72rem}}
 a{color:var(--acc)}
 </style>
 </head>
@@ -66,6 +67,16 @@ const slug = s => s.toLowerCase().replace(/['’.]/g, "").replace(/\s+/g, "-");
 const norm = s => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 const badge = t => `<span class="tp" style="${TC[t] ? "background:" + TC[t] : ""}">${t ? esc(pretty(t)) : "?"}</span>`;
 
+const CI = {
+  physical: ["Físico", "#e8622a", '<path d="M12 3.5l2.4 5.6 6.1.6-4.6 4 1.4 6L12 16.6 6.7 19.7l1.4-6-4.6-4 6.1-.6z" fill="#fff"/>'],
+  special: ["Especial", "#4592e6", '<circle cx="12" cy="12" r="6.5" fill="none" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="2.2" fill="#fff"/>'],
+  status: ["Status", "#8d96b0", '<rect x="5.5" y="10.5" width="13" height="3" rx="1.5" fill="#fff"/>']
+};
+const cls = c => { const x = CI[c]; return x ? `<span title="${x[0]}" style="display:inline-flex"><svg class="ci" viewBox="0 0 24 24" role="img" aria-label="${x[0]}"><circle cx="12" cy="12" r="11.5" fill="${x[1]}"/>${x[2]}</svg></span>` : ""; };
+const enName = (o, fb) => ((o.names || []).find(n => n.language.name === "en") || {}).name || fb;
+const idx = {};
+const index = kind => idx[kind] || (idx[kind] = j(`${POKEAPI}/${kind}?limit=3000`).then(d => Object.fromEntries(d.results.map(r => [norm(r.name), r.name]))).catch(() => { delete idx[kind]; return {}; }));
+
 let mon = null, mode = "vgc";
 
 /* ---------- Dados competitivos ---------- */
@@ -92,12 +103,17 @@ const none = '<p class="mute">Sem dados.</p>';
 async function competitive(kind) {
   const { format, d } = await loadStats(kind, pretty(mon.name));
   const n = d.n, L = (key, c) => topN(pick(d, key, key.toLowerCase()), c, n);
-  const moves = L("Moves", 8), items = L("Items", 6);
-  const mt = {};
-  await Promise.all(moves.map(async m => { try { mt[m.k] = (await j(`${POKEAPI}/move/${slug(m.k)}`)).type.name; } catch (e) {} }));
-  const mRows = moves.map(m => line(`${badge(mt[m.k])}<b>${esc(m.k)}</b>`, m.share)).join("") || none;
-  const iRows = items.map(i => line(`<img src="${ITEM_IMG(slug(i.k))}" alt="" onerror="this.style.visibility='hidden'"><b>${esc(i.k)}</b>`, i.share)).join("") || none;
-  const aRows = L("Abilities", 3).map(a => line(`<b>${esc(a.k)}</b>`, a.share)).join("") || none;
+  const moves = L("Moves", 8), items = L("Items", 6), abils = L("Abilities", 3);
+  const [mi, ii, ai] = await Promise.all([index("move"), index("item"), index("ability")]);
+  const look = async (kind, map, key) => { const s = map[norm(key)]; if (!s) return null; try { return { s, o: await j(`${POKEAPI}/${kind}/${s}`) }; } catch (e) { return null; } };
+  const [md, idd, ad] = await Promise.all([
+    Promise.all(moves.map(m => look("move", mi, m.k))),
+    Promise.all(items.map(i => look("item", ii, i.k))),
+    Promise.all(abils.map(a => look("ability", ai, a.k)))]);
+  const cap = k => k.charAt(0).toUpperCase() + k.slice(1);
+  const mRows = moves.map((m, x) => { const r = md[x]; return line(r ? `${badge(r.o.type.name)}${cls(r.o.damage_class.name)}<b>${esc(enName(r.o, pretty(r.s)))}</b>` : `<b>${esc(cap(m.k))}</b>`, m.share); }).join("") || none;
+  const iRows = items.map((i, x) => { const r = idd[x]; const img = r ? (r.o.sprites.default || ITEM_IMG(r.s)) : ""; return line(`${img ? `<img src="${img}" alt="" onerror="this.style.visibility='hidden'">` : ""}<b>${esc(r ? enName(r.o, pretty(r.s)) : cap(i.k))}</b>`, i.share); }).join("") || none;
+  const aRows = abils.map((a, x) => { const r = ad[x]; return line(`<b>${esc(r ? enName(r.o, pretty(r.s)) : cap(a.k))}</b>`, a.share); }).join("") || none;
   const sRows = L("Spreads", 4).map(x => {
     const [nat, ev] = x.k.split(":"), v = (ev || "").split("/").map(Number);
     return line(`<b>${esc(nat)} · ${v.map((q, i) => q ? q + " " + NS[i] : "").filter(Boolean).join(" / ")}</b>`, x.share);
@@ -132,7 +148,7 @@ async function casual() {
   const abil = mon.abilities.map(a => pretty(a.ability.name) + (a.is_hidden ? " (oculta)" : ""));
   return `<p class="mute">Sugestão automática a partir dos golpes que ele aprende por nível em ${esc(pretty(GAME))}. Não vem de estatísticas de jogadores.</p>
   <div class="grid">
-   <div class="card"><h3>Golpes sugeridos</h3>${chosen.map(m => `<div class="row" style="grid-template-columns:1fr auto"><span class="nm">${badge(m.type.name)}<b>${esc(pretty(m.name))}</b></span><span class="pc">poder ${m.power}</span></div>`).join("") || none}</div>
+   <div class="card"><h3>Golpes sugeridos</h3>${chosen.map(m => `<div class="row" style="grid-template-columns:1fr auto"><span class="nm">${badge(m.type.name)}${cls(m.damage_class.name)}<b>${esc(enName(m, pretty(m.name)))}</b></span><span class="pc">poder ${m.power}</span></div>`).join("") || none}</div>
    <div class="card"><h3>Habilidades</h3><p style="margin:0">${abil.map(esc).join("<br>")}</p><h3 style="margin-top:14px">Fraco contra</h3><div>${weak.map(t => badge(t) + '<span class="mute">×' + mult[t] + '</span> ').join("") || "Nada"}</div></div>
   </div>
   <div class="card"><h3>Tipos que cobrem suas fraquezas</h3><div>${cover.map(badge).join("") || "—"}</div></div>`;
