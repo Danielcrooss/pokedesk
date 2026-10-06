@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Buscador de builds Pokémon</title>
+<style>
+:root{--bg:#f2f5fa;--card:#fff;--ink:#17203a;--mute:#5b6786;--line:#d9e0ee;--acc:#d62f3a;--accink:#fff}
+@media (prefers-color-scheme:dark){:root{--bg:#10162a;--card:#19213a;--ink:#eef2fb;--mute:#9aa6c4;--line:#2a3558;--acc:#ff5560;--accink:#10162a}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:780px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:2rem;margin:8px 0 4px;letter-spacing:-.02em}
+.sub{color:var(--mute);margin:0 0 18px}
+input{width:100%;font:inherit;padding:14px 16px;border-radius:12px;border:2px solid var(--line);background:var(--card);color:var(--ink)}
+input:focus-visible,button:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:14px}
+.head{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.head img{width:96px;height:96px;image-rendering:pixelated}
+.head h2{margin:0;font-size:1.6rem}
+.t{display:inline-block;padding:2px 10px;border-radius:6px;font-size:.85rem;font-weight:600;color:#fff;margin-right:6px;background:#667}
+.stat{display:grid;grid-template-columns:44px 1fr 34px;gap:8px;align-items:center;font-size:.85rem;margin-top:5px}
+.bar{height:8px;background:var(--line);border-radius:4px;overflow:hidden}.bar i{display:block;height:100%;background:var(--acc)}
+.tabs{display:flex;gap:6px;margin:18px 0 12px}
+.tab{flex:1;padding:10px 6px;border-radius:10px;border:2px solid var(--line);background:var(--card);color:var(--ink);font:600 1rem system-ui,sans-serif;cursor:pointer}
+.tab[aria-selected="true"]{background:var(--acc);border-color:var(--acc);color:var(--accink)}
+h3{margin:0 0 8px;font-size:1.05rem}
+.row{display:grid;grid-template-columns:minmax(110px,40%) 1fr 48px;gap:8px;align-items:center;font-size:.92rem;margin:4px 0}
+.row span:last-child{text-align:right;color:var(--mute)}
+.chip{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:99px;padding:6px 14px;font:inherit;cursor:pointer;margin:0 6px 6px 0}
+.mute{color:var(--mute);font-size:.9rem}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:600px){.grid{grid-template-columns:1fr}.row{grid-template-columns:100px 1fr 44px}}
+a{color:var(--acc)}
+</style>
+</head>
+<body>
+<main>
+<h1>Buscador de builds Pokémon</h1>
+<p class="sub">Digite o nome, escolha o formato e veja builds, golpes, itens e companheiros de time.</p>
+<input id="q" list="names" placeholder="Ex.: Garchomp" aria-label="Nome do Pokémon" autocomplete="off">
+<datalist id="names"></datalist>
+<div id="out"></div>
+<p class="mute" id="foot"></p>
+</main>
+<script>
+/* ============ CONFIGURAÇÃO (ajuste aqui) ============ */
+// Estatísticas competitivas: JSON do projeto @pkmn (dados do Smogon), servido pelo GitHub Pages.
+const STATS_URL = f => `https://pkmn.github.io/smogon/data/stats/${f}.json`;
+// Formatos tentados em ordem. O primeiro que carregar é usado.
+const FORMATS = {
+  vgc:     ["gen9vgc2026regf", "gen9vgc2025regj", "gen9vgc2025regi", "gen9vgc2025regg"],
+  singles: ["gen9ou"]
+};
+const POKEAPI = "https://pokeapi.co/api/v2";
+const GAME = "scarlet-violet";   // jogo usado para sugerir golpes no modo casual
+/* ==================================================== */
+
+const NS = ["PS","Atq","Def","SpA","SpD","Vel"];
+const TC = {normal:"#8a8a7a",fire:"#e2562a",water:"#3f7fd6",electric:"#d9a900",grass:"#4a9e3f",ice:"#4fb5c9",fighting:"#b0392e",poison:"#8e4aa8",ground:"#b8893a",flying:"#6b8fd6",psychic:"#d6558a",bug:"#8a9a1f",rock:"#8f7d3a",ghost:"#6a4c93",dragon:"#5b4fd0",dark:"#4a3f3a",steel:"#6f8fa3",fairy:"#d4649a"};
+const MODES = [["vgc","VGC (Doubles)"],["singles","Singles"],["casual","Casual"]];
+const $ = id => document.getElementById(id);
+const cache = new Map();
+const j = async u => { if (cache.has(u)) return cache.get(u); const r = await fetch(u); if (!r.ok) throw new Error(r.status); const d = await r.json(); cache.set(u, d); return d; };
+const pretty = s => s.split("-").map(w => w[0].toUpperCase() + w.slice(1)).join(" ");
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+let mon = null, mode = "vgc", names = [];
+
+/* ---------- Dados competitivos ---------- */
+const pick = (o, ...ks) => { for (const k of ks) if (o && o[k]) return o[k]; return {}; };
+const top = (o, n) => { const e = Object.entries(o).filter(([k]) => k && k !== "Nothing" && k !== "nothing").sort((a,b) => b[1]-a[1]); const s = e.reduce((t,x) => t + x[1], 0) || 1; const m = e[0] ? e[0][1] : 1; return e.slice(0,n).map(([k,v]) => ({k, share: v/s, rel: v/m})); };
+
+async function loadStats(kind, name) {
+  let lastErr = "formato não encontrado";
+  for (const f of FORMATS[kind]) {
+    try {
+      const raw = await j(STATS_URL(f));
+      const all = raw.pokemon || raw.data || raw;
+      const key = Object.keys(all).find(k => k.toLowerCase() === name.toLowerCase());
+      if (!key) { lastErr = "sem dados deste Pokémon em " + f; continue; }
+      return { format: f, d: all[key] };
+    } catch (e) { lastErr = "não consegui carregar " + f; }
+  }
+  throw new Error(lastErr);
+}
+
+function rows(list, showPct) {
+  return list.map(x => `<div class="row"><span>${esc(x.k)}</span><div class="bar"><i style="width:${Math.round(x.rel*100)}%"></i></div><span>${showPct ? Math.round(x.share*100)+"%" : ""}</span></div>`).join("") || '<p class="mute">Sem dados.</p>';
+}
+
+function spreadRows(sp) {
+  const l = top(sp, 4).map(x => { const [nat, ev] = x.k.split(":"); const v = (ev||"").split("/").map(Number); const txt = v.map((n,i) => n ? n+" "+NS[i] : "").filter(Boolean).join(" / "); return {k: nat + " · " + txt, share: x.share, rel: x.rel}; });
+  return rows(l, true);
+}
+
+async function competitive(kind) {
+  const {format, d} = await loadStats(kind, pretty(mon.name));
+  const mates = top(pick(d, "teammates", "Teammates"), 8);
+  return `<p class="mute">Fonte: estatísticas do Smogon, formato ${esc(format)}.</p>
+  <div class="grid">
+   <div class="card"><h3>Golpes mais usados</h3>${rows(top(pick(d,"moves","Moves"),8), false)}</div>
+   <div class="card"><h3>Itens</h3>${rows(top(pick(d,"items","Items"),6), true)}</div>
+   <div class="card"><h3>Habilidades</h3>${rows(top(pick(d,"abilities","Abilities"),3), true)}</div>
+   <div class="card"><h3>Natureza e EVs</h3>${spreadRows(pick(d,"spreads","Spreads"))}</div>
+  </div>
+  <div class="card"><h3>Combina com</h3>${mates.map(x => `<button class="chip" data-n="${esc(x.k)}">${esc(x.k)}</button>`).join("") || '<p class="mute">Sem dados.</p>'}</div>`;
+}
+
+/* ---------- Modo casual (calculado com a PokéAPI) ---------- */
+async function casual() {
+  const types = mon.types.map(t => t.type.name);
+  const best = mon.stats[1].base_stat >= mon.stats[3].base_stat ? "physical" : "special";
+  const learn = mon.moves.filter(m => m.version_group_details.some(v => v.version_group.name === GAME && v.move_learn_method.name === "level-up")).slice(0, 40);
+  const mv = (await Promise.all(learn.map(m => j(m.move.url).catch(() => null)))).filter(x => x && x.power);
+  const score = m => m.power * (types.includes(m.type.name) ? 1.5 : 1) * (m.damage_class.name === best ? 1 : .6) * (m.accuracy ? m.accuracy/100 : 1);
+  mv.sort((a,b) => score(b) - score(a));
+  const chosen = [], used = new Set();
+  for (const m of mv) { if (chosen.length >= 4) break; if (!used.has(m.type.name) || chosen.length >= 2) { chosen.push(m); used.add(m.type.name); } }
+  const rel = await Promise.all(types.map(t => j(`${POKEAPI}/type/${t}`)));
+  const mult = {};
+  rel.forEach(r => { r.damage_relations.double_damage_from.forEach(x => mult[x.name] = (mult[x.name]||1)*2); r.damage_relations.half_damage_from.forEach(x => mult[x.name] = (mult[x.name]||1)*.5); r.damage_relations.no_damage_from.forEach(x => mult[x.name] = 0); });
+  const weak = Object.keys(mult).filter(t => mult[t] > 1);
+  const tr = await Promise.all(Object.keys(TC).map(t => j(`${POKEAPI}/type/${t}`)));
+  const cover = tr.filter(t => { const half = [...t.damage_relations.half_damage_from, ...t.damage_relations.no_damage_from].map(x => x.name); return weak.length && weak.every(w => half.includes(w)) || weak.filter(w => half.includes(w)).length >= Math.max(1, weak.length - 1); }).map(t => t.name);
+  const abil = mon.abilities.map(a => pretty(a.ability.name) + (a.is_hidden ? " (oculta)" : ""));
+  return `<p class="mute">Sugestão automática a partir dos golpes que ele aprende por nível em ${esc(pretty(GAME))}. Não vem de estatísticas de jogadores.</p>
+  <div class="grid">
+   <div class="card"><h3>Golpes sugeridos</h3>${chosen.map(m => `<div class="row"><span>${esc(pretty(m.name))}</span><span class="mute" style="grid-column:span 2;text-align:left">${esc(pretty(m.type.name))} · poder ${m.power}</span></div>`).join("") || '<p class="mute">Sem golpes de ataque por nível neste jogo.</p>'}</div>
+   <div class="card"><h3>Habilidades</h3><p style="margin:0">${abil.map(esc).join("<br>")}</p><h3 style="margin-top:14px">Fraco contra</h3><p style="margin:0">${weak.map(t => pretty(t) + " ×" + mult[t]).join(", ") || "Nada"}</p></div>
+  </div>
+  <div class="card"><h3>Tipos que cobrem suas fraquezas</h3><p style="margin:0">${cover.map(pretty).join(", ") || "—"}</p></div>`;
+}
+
+/* ---------- Tela ---------- */
+function shell() {
+  const m = mon, img = m.sprites.other["official-artwork"].front_default || m.sprites.front_default;
+  return `<div class="card"><div class="head"><img src="${img}" alt="${esc(pretty(m.name))}"><div><h2>${esc(pretty(m.name))}</h2><div>${m.types.map(t => `<span class="t" style="background:${TC[t.type.name]}">${esc(pretty(t.type.name))}</span>`).join("")}</div></div></div>
+  ${m.stats.map((s,i) => `<div class="stat"><span>${NS[i]}</span><div class="bar"><i style="width:${Math.min(100, s.base_stat/1.6)}%"></i></div><b>${s.base_stat}</b></div>`).join("")}</div>
+  <div class="tabs" role="tablist">${MODES.map(x => `<button class="tab" role="tab" data-m="${x[0]}" aria-selected="${x[0]===mode}">${x[1]}</button>`).join("")}</div><div id="tab"></div>`;
+}
+
+async function renderTab() {
+  const t = $("tab"); t.innerHTML = '<p class="mute">Carregando…</p>';
+  try { t.innerHTML = mode === "casual" ? await casual() : await competitive(mode); }
+  catch (e) { t.innerHTML = `<div class="card">Não foi possível carregar os dados competitivos (${esc(e.message)}). Veja direto no <a href="https://www.pikalytics.com/pokedex/${mode==="vgc"?"gen9vgc2026regf":"gen9ou"}/${encodeURIComponent(pretty(mon.name))}" target="_blank" rel="noopener">Pikalytics</a>.</div>`; }
+}
+
+async function show(raw) {
+  const id = raw.trim().toLowerCase().replace(/\s+/g, "-");
+  if (!id) return;
+  $("out").innerHTML = '<p class="mute">Buscando…</p>';
+  try { mon = await j(`${POKEAPI}/pokemon/${id}`); }
+  catch { $("out").innerHTML = `<div class="card">Não encontrei "${esc(raw)}". Confira o nome (em inglês).</div>`; return; }
+  $("q").value = pretty(mon.name);
+  $("out").innerHTML = shell(); renderTab();
+}
+
+document.addEventListener("click", e => {
+  const n = e.target.closest("[data-n]"), t = e.target.closest("[data-m]");
+  if (n) show(n.dataset.n);
+  if (t && mon) { mode = t.dataset.m; document.querySelectorAll(".tab").forEach(b => b.setAttribute("aria-selected", b.dataset.m === mode)); renderTab(); }
+});
+$("q").addEventListener("keydown", e => { if (e.key === "Enter") show($("q").value); });
+$("q").addEventListener("change", () => show($("q").value));
+
+j(`${POKEAPI}/pokemon?limit=1100`).then(d => { names = d.results.map(r => r.name); $("names").innerHTML = names.map(n => `<option value="${esc(pretty(n))}">`).join(""); }).catch(() => {});
+$("foot").innerHTML = 'Dados: <a href="https://pokeapi.co" target="_blank" rel="noopener">PokéAPI</a> e estatísticas do <a href="https://www.smogon.com/stats/" target="_blank" rel="noopener">Smogon</a>.';
+</script>
+</body>
+</html>
