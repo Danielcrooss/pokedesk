@@ -69,7 +69,7 @@ let mon = null, mode = "vgc", names = [];
 
 /* ---------- Dados competitivos ---------- */
 const pick = (o, ...ks) => { for (const k of ks) if (o && o[k]) return o[k]; return {}; };
-const top = (o, n) => { const e = Object.entries(o).filter(([k]) => k && k !== "Nothing" && k !== "nothing").sort((a,b) => b[1]-a[1]); const s = e.reduce((t,x) => t + x[1], 0) || 1; const m = e[0] ? e[0][1] : 1; return e.slice(0,n).map(([k,v]) => ({k, share: v/s, rel: v/m})); };
+const topN = (o, n) => { const e = Object.entries(o).filter(([k]) => k && k !== "Nothing" && k !== "nothing").sort((a,b) => b[1]-a[1]); const s = e.reduce((t,x) => t + x[1], 0) || 1; const m = e[0] ? e[0][1] : 1; return e.slice(0,n).map(([k,v]) => ({k, share: v/s, rel: v/m})); };
 
 async function loadStats(kind, name) {
   let lastErr = "formato não encontrado";
@@ -90,18 +90,18 @@ function rows(list, showPct) {
 }
 
 function spreadRows(sp) {
-  const l = top(sp, 4).map(x => { const [nat, ev] = x.k.split(":"); const v = (ev||"").split("/").map(Number); const txt = v.map((n,i) => n ? n+" "+NS[i] : "").filter(Boolean).join(" / "); return {k: nat + " · " + txt, share: x.share, rel: x.rel}; });
+  const l = topN(sp, 4).map(x => { const [nat, ev] = x.k.split(":"); const v = (ev||"").split("/").map(Number); const txt = v.map((n,i) => n ? n+" "+NS[i] : "").filter(Boolean).join(" / "); return {k: nat + " · " + txt, share: x.share, rel: x.rel}; });
   return rows(l, true);
 }
 
 async function competitive(kind) {
   const {format, d} = await loadStats(kind, pretty(mon.name));
-  const mates = top(pick(d, "teammates", "Teammates"), 8);
+  const mates = topN(pick(d, "teammates", "Teammates"), 8);
   return `<p class="mute">Fonte: estatísticas do Smogon, formato ${esc(format)}.</p>
   <div class="grid">
-   <div class="card"><h3>Golpes mais usados</h3>${rows(top(pick(d,"moves","Moves"),8), false)}</div>
-   <div class="card"><h3>Itens</h3>${rows(top(pick(d,"items","Items"),6), true)}</div>
-   <div class="card"><h3>Habilidades</h3>${rows(top(pick(d,"abilities","Abilities"),3), true)}</div>
+   <div class="card"><h3>Golpes mais usados</h3>${rows(topN(pick(d,"moves","Moves"),8), false)}</div>
+   <div class="card"><h3>Itens</h3>${rows(topN(pick(d,"items","Items"),6), true)}</div>
+   <div class="card"><h3>Habilidades</h3>${rows(topN(pick(d,"abilities","Abilities"),3), true)}</div>
    <div class="card"><h3>Natureza e EVs</h3>${spreadRows(pick(d,"spreads","Spreads"))}</div>
   </div>
   <div class="card"><h3>Combina com</h3>${mates.map(x => `<button class="chip" data-n="${esc(x.k)}">${esc(x.k)}</button>`).join("") || '<p class="mute">Sem dados.</p>'}</div>`;
@@ -169,4 +169,3 @@ $("foot").innerHTML = 'Dados: <a href="https://pokeapi.co" target="_blank" rel="
 </script>
 </body>
 </html>
-
