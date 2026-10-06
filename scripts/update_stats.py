@@ -5,7 +5,7 @@ BASE = "https://www.smogon.com/stats/"
 # kind -> (padrao do arquivo, cutoffs de rating preferidos)
 KINDS = {
     "singles": (r"^(gen9ou)-(\d+)\.json$", [1825, 1695, 1500, 0]),
-    "vgc": (r"^(gen9vgc\d{4}reg[a-z]+)-(\d+)\.json$", [1760, 1630, 1500, 0]),
+    "vgc": (r"^(gen9(?:champions)?vgc\d{4}reg[a-z]+)-(\d+)\.json$", [1630, 1760, 1500, 0]),
 }
 LIMITS = {"Abilities": 3, "Items": 6, "Moves": 8, "Spreads": 5, "Teammates": 10}
 
@@ -27,7 +27,9 @@ def find(month, pattern, prefs):
     found = [m for m in found if m]
     if not found:
         return None
-    fmt = max(m.group(1) for m in found)  # regulamento mais recente
+    # regulamento mais recente: compara por ano e letra, ignorando o prefixo do nome
+    key = lambda n: re.search(r"(\d{4})reg([a-z]+)", n).groups() if re.search(r"\d{4}reg", n) else (n,)
+    fmt = max({m.group(1) for m in found}, key=key)
     cuts = {int(m.group(2)) for m in found if m.group(1) == fmt}
     cut = next((c for c in prefs if c in cuts), max(cuts))
     return fmt, cut, f"{BASE}{month}/chaos/{fmt}-{cut}.json"
