@@ -42,6 +42,10 @@ h3{margin:0 0 10px;font-size:.95rem;font-weight:600;padding-bottom:6px;border-bo
 .mate img,.mate .ph{width:48px;height:48px;flex:none;image-rendering:pixelated}
 .mate .mn{flex:1;min-width:0}
 .mate small{color:var(--mute)}
+h4{margin:14px 0 8px;font-size:.85rem;font-weight:600;color:var(--acc)}
+.set{border-left:3px solid var(--acc);padding-left:10px;margin:0 0 12px;font-size:.9rem}
+.set b{display:block;font-weight:600}
+.set span{display:block;font-size:.82rem;color:var(--mute);line-height:1.45}
 .chip{border:1px solid var(--line);background:var(--card2);color:var(--ink);border-radius:99px;padding:5px 12px;font:inherit;font-size:.85rem;cursor:pointer;margin:0 6px 6px 0}
 .chip small{color:var(--mute);margin-left:4px}
 .mute{color:var(--mute);font-size:.85rem}
@@ -88,6 +92,19 @@ const idx = {};
 const index = kind => idx[kind] || (idx[kind] = j(`${POKEAPI}/${kind}?limit=3000`).then(d => Object.fromEntries(d.results.map(r => [norm(r.name), r.name]))).catch(() => { delete idx[kind]; return {}; }));
 
 const sprite = async name => { const sl = slug(name); for (const id of [sl, sl.split("-")[0]]) { try { return (await j(`${POKEAPI}/pokemon/${id}`)).sprites.front_default || ""; } catch (e) {} } return ""; };
+const fmtName = f => { const m = f.match(/^gen9vgc(\d{4})reg([a-z]+)$/); return m ? `VGC ${m[1]} Reg ${m[2].toUpperCase()}` : f === "gen9doublesou" ? "Doubles OU" : f.replace(/^gen9/, "").toUpperCase(); };
+async function strategies(kind, name) {
+  let raw; try { raw = await j("data/strategies.json"); } catch (e) { return ""; }
+  const grp = raw[kind === "singles" ? "singles" : "vgcsv"] || {};
+  const key = Object.keys(grp).find(k => norm(k) === norm(name));
+  const note = kind === "vgc" ? '<p class="mute">O Smogon não publica estratégias para o Champions. Estes são os sets de Scarlet/Violet, como referência: golpes e itens podem não existir no Champions.</p>' : "";
+  const link = `<p class="mute" style="margin-bottom:0">Análise completa no <a href="https://www.smogon.com/dex/sv/pokemon/${slug(name)}/" target="_blank" rel="noopener">Smogon Strategy Dex</a>.</p>`;
+  if (!key) return `<div class="card"><h3>Estratégias (Smogon)</h3>${note}<p class="mute">Sem sets do Smogon para este Pokémon neste formato.</p>${link}</div>`;
+  const body = grp[key].map(g => `<h4>${esc(fmtName(g.format))}</h4>` + g.sets.map(s => `<div class="set"><b>${esc(s.name)}</b>
+    <span>${[s.item && "Item: " + s.item, s.ability && "Habilidade: " + s.ability, s.nature && "Natureza: " + s.nature, s.tera && "Tera: " + s.tera].filter(Boolean).map(esc).join(" · ")}</span>
+    ${s.evs ? `<span>EVs: ${esc(s.evs)}</span>` : ""}<span>Golpes: ${s.moves.map(esc).join(", ")}</span></div>`).join("")).join("");
+  return `<div class="card"><h3>Estratégias (Smogon)</h3>${note}${body}${link}</div>`;
+}
 let mon = null, mode = "vgc";
 
 /* ---------- Dados competitivos ---------- */
@@ -133,6 +150,7 @@ async function competitive(kind) {
   const mateList = L("Teammates", 10);
   const sprites = await Promise.all(mateList.map(x => sprite(x.k)));
   const mates = mateList.map((x, i) => `<button class="mate" data-n="${esc(x.k)}">${sprites[i] ? `<img src="${sprites[i]}" alt="">` : '<i class="ph"></i>'}<span class="mn">${esc(x.k)}</span><small>${pct(x.share)}</small></button>`).join("") || none;
+  const strat = await strategies(kind, pretty(mon.name));
   return `<div class="layout"><div>
   <p class="mute">Fonte: estatísticas do Smogon, formato ${esc(format)}.</p>
   <div class="grid">
@@ -140,7 +158,7 @@ async function competitive(kind) {
    <div class="card"><h3>Itens</h3>${iRows}</div>
    <div class="card"><h3>Habilidades</h3>${aRows}</div>
    <div class="card"><h3>Natureza e EVs</h3>${sRows}</div>
-  </div></div>
+  </div>${strat}</div>
   <aside class="card"><h3>Companheiros de time</h3>${mates}</aside></div>`;
 }
 
