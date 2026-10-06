@@ -4,8 +4,11 @@ import json, os, re, sys, urllib.request
 BASE = "https://www.smogon.com/stats/"
 # kind -> (padrao do arquivo, cutoffs de rating preferidos)
 KINDS = {
-    "singles": (r"^(gen9ou)-(\d+)\.json$", [1825, 1695, 1500, 0]),
-    "vgc": (r"^(gen9(?:champions)?vgc\d{4}reg[a-z]+)-(\d+)\.json$", [1630, 1760, 1500, 0]),
+    "singles": (r"^(gen9ou)-(\d+)\.json$", [1825, 1695, 1500, 0], 4),
+    # VGC atual (Pokemon Champions) ou, se nao houver, o mais recente dos jogos principais
+    "vgc": (r"^(gen9(?:champions)?vgc\d{4}reg[a-z]+)-(\d+)\.json$", [1630, 1760, 1500, 0], 4),
+    # VGC dos jogos principais (Scarlet/Violet): procura ate 36 meses para tras
+    "vgcsv": (r"^(gen9vgc\d{4}reg[a-z]+)-(\d+)\.json$", [1630, 1760, 1500, 0], 36),
 }
 LIMITS = {"Abilities": 3, "Items": 6, "Moves": 8, "Spreads": 5, "Teammates": 10}
 
@@ -38,23 +41,25 @@ def find(month, pattern, prefs):
 def trim(chaos):
     out = {}
     for name, p in chaos["data"].items():
-        if p.get("Raw count", 0) < 100:
+        if p.get("Raw count", 0) < 20:
             continue
-        out[name] = {
+        entry = {
             key: {k: round(v, 3) for k, v in sorted(
                 ((k, v) for k, v in p.get(key, {}).items() if v > 0),
                 key=lambda x: -x[1])[:limit]}
             for key, limit in LIMITS.items()
         }
+        entry["n"] = round(sum(p.get("Abilities", {}).values()) or 1, 3)
+        out[name] = entry
     return out
 
 
 def main():
     os.makedirs("data", exist_ok=True)
     ok = 0
-    recent = months()[:4]
-    for kind, (pattern, prefs) in KINDS.items():
-        for month in recent:
+    all_months = months()
+    for kind, (pattern, prefs, back) in KINDS.items():
+        for month in all_months[:back]:
             try:
                 res = find(month, pattern, prefs)
                 if not res:
