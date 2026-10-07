@@ -47,6 +47,11 @@ h4{margin:14px 0 8px;font-size:.85rem;font-weight:600;color:var(--acc)}
 .set b{display:block;font-weight:600}
 .set span{display:block;font-size:.82rem;color:var(--mute);line-height:1.45}
 .evo{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:6px 0}
+.lvrow{display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid var(--line);font-size:.88rem}
+.lvl{width:44px;flex:none}
+.mvchip{display:inline-flex;align-items:center;gap:5px;background:var(--card2);border:1px solid var(--line);border-radius:8px;padding:2px 8px 2px 4px;margin:0 6px 6px 0;font-size:.82rem}
+.mvchip .tp{min-width:0;margin:0;padding:0 6px;font-size:.7rem}
+.mvchip .ci{width:18px;height:18px}
 .chip{border:1px solid var(--line);background:var(--card2);color:var(--ink);border-radius:99px;padding:5px 12px;font:inherit;font-size:.85rem;cursor:pointer;margin:0 6px 6px 0}
 .chip small{color:var(--mute);margin-left:4px}
 .mute{color:var(--mute);font-size:.85rem}
@@ -105,6 +110,26 @@ async function strategies(kind, name) {
     <span>${[s.item && "Item: " + s.item, s.ability && "Habilidade: " + s.ability, s.nature && "Natureza: " + s.nature, s.tera && "Tera: " + s.tera].filter(Boolean).map(esc).join(" · ")}</span>
     ${s.evs ? `<span>EVs: ${esc(s.evs)}</span>` : ""}<span>Golpes: ${s.moves.map(esc).join(", ")}</span></div>`).join("")).join("");
   return `<div class="card"><h3>Estratégias (Smogon)</h3>${note}${body}${link}</div>`;
+}
+const ROLE_PT = { "Fast Attacker": "Atacante rápido", "Setup Sweeper": "Atacante com setup", "Wallbreaker": "Quebra-defesas", "Bulky Attacker": "Atacante resistente", "Bulky Setup": "Setup resistente", "Fast Support": "Suporte rápido", "Bulky Support": "Suporte resistente", "Staller": "Desgaste", "Tera Blast user": "Usuário de Tera Blast", "Offensive Protect": "Protect ofensivo", "Choice Item user": "Usuário de item Choice", "AV Pivot": "Pivô com Assault Vest", "Spinner": "Removedor de hazards", "Doubles Fast Attacker": "Atacante rápido (Doubles)", "Doubles Setup Sweeper": "Atacante com setup (Doubles)", "Doubles Wallbreaker": "Quebra-defesas (Doubles)", "Doubles Bulky Attacker": "Atacante resistente (Doubles)", "Doubles Bulky Setup": "Setup resistente (Doubles)", "Doubles Support": "Suporte (Doubles)", "Baton Pass user": "Usuário de Baton Pass", "Berry Sweeper": "Atacante com berry" };
+const trCache = (() => { try { return JSON.parse(localStorage.getItem("trpt1") || "{}"); } catch (e) { return {}; } })();
+const decode = s => { const e = document.createElement("textarea"); e.innerHTML = s; return e.value; };
+async function tr(t) {
+  if (!t) return "";
+  if (trCache[t]) return trCache[t];
+  try {
+    const d = await (await fetch("https://api.mymemory.translated.net/get?langpair=en|pt-BR&q=" + encodeURIComponent(t))).json();
+    const out = d && d.responseData && d.responseData.translatedText;
+    if (out && Number(d.responseStatus) === 200 && !/MYMEMORY/i.test(out)) {
+      const v = decode(out); trCache[t] = v;
+      try { localStorage.setItem("trpt1", JSON.stringify(trCache)); } catch (e) {}
+      return v;
+    }
+  } catch (e) {}
+  return t;
+}
+function translateAll(root, my) {
+  root.querySelectorAll("[data-tr]").forEach(el => tr(el.dataset.tr).then(v => { if (renderTab.id === my) el.textContent = v; }));
 }
 let mon = null, mode = "vgc";
 
@@ -205,7 +230,7 @@ async function casual() {
   const itemSlug = TYPE_ITEM[chosen[0] ? chosen[0].o.type.name : types[0]];
 
   const ab = await Promise.all(mon.abilities.map(a => j(a.ability.url).catch(() => null)));
-  const abHtml = mon.abilities.map((a, i) => { const o = ab[i], eff = o && (o.effect_entries.find(e => e.language.name === "en") || {}).short_effect; return `<div style="margin:0 0 8px"><b>${esc(o ? enName(o, pretty(a.ability.name)) : pretty(a.ability.name))}</b>${a.is_hidden ? ' <span class="mute">(oculta)</span>' : ""}${eff ? `<span class="ev">${esc(eff)}</span>` : ""}</div>`; }).join("");
+  const abHtml = mon.abilities.map((a, i) => { const o = ab[i], eff = o && (o.effect_entries.find(e => e.language.name === "en") || {}).short_effect; return `<div style="margin:0 0 8px"><b>${esc(o ? enName(o, pretty(a.ability.name)) : pretty(a.ability.name))}</b>${a.is_hidden ? ' <span class="mute">(oculta)</span>' : ""}${eff ? `<span class="ev" data-tr="${esc(eff)}">${esc(eff)}</span>` : ""}</div>`; }).join("");
 
   const rel = await Promise.all(types.map(t => j(`${POKEAPI}/type/${t}`)));
   const mult = {};
@@ -214,7 +239,8 @@ async function casual() {
   const tr = await Promise.all(Object.keys(TC).map(t => j(`${POKEAPI}/type/${t}`)));
   const cover = tr.filter(t => { const half = [...t.damage_relations.half_damage_from, ...t.damage_relations.no_damage_from].map(x => x.name); return weak.length && weak.filter(w => half.includes(w)).length >= Math.max(1, weak.length - 1); }).map(t => t.name);
 
-  const lv = mon.moves.map(m => { const d = m.version_group_details.find(v => v.version_group.name === GAME && v.move_learn_method.name === "level-up"); return d ? [d.level_learned_at, m.move.name] : null; }).filter(Boolean).sort((a, b) => a[0] - b[0]);
+  const lv = mon.moves.map(m => { const d = m.version_group_details.find(v => v.version_group.name === GAME && v.move_learn_method.name === "level-up"); return d ? [d.level_learned_at, m.move.name, m.move.url] : null; }).filter(Boolean).sort((a, b) => a[0] - b[0]);
+  const lvd = await Promise.all(lv.map(x => j(x[2]).catch(() => null)));
 
   let roles = "";
   try {
@@ -222,9 +248,12 @@ async function casual() {
     if (key) {
       const [mi, ii, ai] = await Promise.all([index("move"), index("item"), index("ability")]);
       const nm = (map, k) => map[norm(k)] ? pretty(map[norm(k)]) : k;
-      roles = `<div class="card"><h3>Papéis sugeridos (Random Battle)</h3><p class="mute" style="margin:0 0 8px">Sets do Pokémon Showdown para batalhas equilibradas${raw[key].level ? ", nível " + raw[key].level : ""}. Boas ideias de função, mas não são específicos da história.</p>${raw[key].roles.map(r => `<div class="set"><b>${esc(r.role)}</b>
+      const rm = {};
+      await Promise.all([...new Set(raw[key].roles.flatMap(r => r.moves))].map(async k => { const s = mi[norm(k)]; if (!s) return; try { rm[k] = await j(`${POKEAPI}/move/${s}`); } catch (e) {} }));
+      const mchip = k => { const o = rm[k]; return o ? `<span class="mvchip">${badge(o.type.name)}${cls(o.damage_class.name)}${esc(enName(o, nm(mi, k)))}</span>` : `<span class="mvchip">${esc(nm(mi, k))}</span>`; };
+      roles = `<div class="card"><h3>Papéis sugeridos (Random Battle)</h3><p class="mute" style="margin:0 0 8px">Sets do Pokémon Showdown para batalhas equilibradas${raw[key].level ? ", nível " + raw[key].level : ""}. Boas ideias de função, mas não são específicos da história.</p>${raw[key].roles.map(r => `<div class="set"><b>${esc(ROLE_PT[r.role] || r.role)}</b>
         <span>Habilidades: ${r.abilities.map(a => esc(nm(ai, a))).join(", ") || "—"}</span>${r.items.length ? `<span>Itens: ${r.items.map(i => esc(nm(ii, i))).join(", ")}</span>` : ""}${r.tera.length ? `<span>Tera: ${r.tera.map(esc).join(", ")}</span>` : ""}
-        <span>Golpes: ${r.moves.map(m => esc(nm(mi, m))).join(", ")}</span></div>`).join("")}</div>`;
+        <span>Golpes:</span><div>${r.moves.map(mchip).join("")}</div></div>`).join("")}</div>`;
     }
   } catch (e) {}
 
@@ -238,11 +267,11 @@ async function casual() {
      ${itemSlug ? `<div class="row" style="grid-template-columns:1fr;margin-top:10px"><span class="nm"><img src="${ITEM_IMG(itemSlug)}" alt="" onerror="this.style.visibility='hidden'"><b>Item: ${esc(pretty(itemSlug))}</b></span></div>` : ""}
     </div>
     <div class="card"><h3>Golpes sugeridos</h3>${chosen.map(x => `<div class="row" style="grid-template-columns:1fr auto"><span class="nm">${badge(x.o.type.name)}${cls(x.o.damage_class.name)}<b>${esc(enName(x.o, pretty(x.o.name)))}</b></span><span class="pc">${x.how} · ${x.o.power}</span></div>`).join("") || none}</div>
-    <div class="card"><h3>Habilidades</h3>${abHtml}</div>
+    <div class="card"><h3>Habilidades</h3>${abHtml}<span class="ev">Descrições traduzidas automaticamente.</span></div>
     <div class="card"><h3>Evolução</h3>${evo || none}</div>
    </div>
    ${roles}
-   <div class="card"><details><summary style="cursor:pointer;color:var(--acc)">Todos os golpes por nível</summary>${lv.map(([l, n]) => `<div class="mute">Lv ${l || "—"} · ${esc(pretty(n))}</div>`).join("") || none}</details></div>
+   <div class="card"><details><summary style="cursor:pointer;color:var(--acc)">Todos os golpes por nível</summary>${lv.map(([l, n], i) => { const o = lvd[i]; return `<div class="lvrow"><span class="mute lvl">Lv ${l || "—"}</span>${o ? badge(o.type.name) + cls(o.damage_class.name) : ""}<span>${esc(o ? enName(o, pretty(n)) : pretty(n))}</span>${o && o.power ? `<span class="mute">· ${o.power}</span>` : ""}</div>`; }).join("") || none}</details></div>
   </div>
   <aside class="card"><h3>Fraco contra</h3><div>${weak.map(t => badge(t) + '<span class="mute">×' + mult[t] + '</span> ').join("") || "Nada"}</div><h3 style="margin-top:14px">Tipos que cobrem as fraquezas</h3><div>${cover.map(badge).join("") || "—"}</div></aside></div>`;
 }
@@ -260,7 +289,7 @@ async function renderTab() {
   let html;
   try { html = mode === "casual" ? await casual() : await competitive(mode); }
   catch (e) { html = `<div class="card">Não foi possível carregar os dados competitivos (${esc(e.message)}). Veja direto no <a href="https://www.pikalytics.com/pokedex" target="_blank" rel="noopener">Pikalytics</a>.</div>`; }
-  if (my === renderTab.id) t.innerHTML = html;
+  if (my === renderTab.id) { t.innerHTML = html; translateAll(t, my); }
 }
 renderTab.id = 0;
 
