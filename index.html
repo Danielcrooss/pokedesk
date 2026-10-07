@@ -45,10 +45,16 @@ h3{margin:0 0 10px;font-size:.95rem;font-weight:600;padding-bottom:6px;border-bo
 h4{margin:14px 0 8px;font-size:.85rem;font-weight:600;color:var(--acc)}
 .set{border-left:3px solid var(--acc);padding-left:10px;margin:0 0 12px;font-size:.9rem}
 .set b{display:block;font-weight:600}
-.set span{display:block;font-size:.82rem;color:var(--mute);line-height:1.45}
+.set>span{display:block;font-size:.82rem;color:var(--mute);line-height:1.45}
 .evo{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:6px 0}
 .lvrow{display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid var(--line);font-size:.88rem}
 .lvl{width:44px;flex:none}
+.mvgrid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:4px 0 8px}
+.mvgrid .mvchip{margin:0;min-width:0}
+.mvrow{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 8px}
+.mvrow .mvchip{margin:0}
+.mvrow .tp{margin:0}
+@media(max-width:480px){.mvgrid{grid-template-columns:1fr}}
 .mvchip{display:inline-flex;align-items:center;gap:5px;background:var(--card2);border:1px solid var(--line);border-radius:8px;padding:2px 8px 2px 4px;margin:0 6px 6px 0;font-size:.82rem}
 .mvchip .tp{min-width:0;margin:0;padding:0 6px;font-size:.7rem}
 .mvchip .ci{width:18px;height:18px}
@@ -250,10 +256,13 @@ async function casual() {
       const nm = (map, k) => map[norm(k)] ? pretty(map[norm(k)]) : k;
       const rm = {};
       await Promise.all([...new Set(raw[key].roles.flatMap(r => r.moves))].map(async k => { const s = mi[norm(k)]; if (!s) return; try { rm[k] = await j(`${POKEAPI}/move/${s}`); } catch (e) {} }));
+      const ri = {};
+      await Promise.all([...new Set(raw[key].roles.flatMap(r => r.items))].map(async k => { const s = ii[norm(k)]; if (!s) return; try { ri[k] = await j(`${POKEAPI}/item/${s}`); } catch (e) {} }));
+      const ichip = k => { const o = ri[k], s = ii[norm(k)], img = o ? (o.sprites.default || ITEM_IMG(s)) : ""; return `<span class="mvchip">${img ? `<img src="${img}" alt="" style="width:22px;height:22px;image-rendering:pixelated" onerror="this.style.visibility='hidden'">` : ""}${esc(o ? enName(o, nm(ii, k)) : nm(ii, k))}</span>`; };
       const mchip = k => { const o = rm[k]; return o ? `<span class="mvchip">${badge(o.type.name)}${cls(o.damage_class.name)}${esc(enName(o, nm(mi, k)))}</span>` : `<span class="mvchip">${esc(nm(mi, k))}</span>`; };
       roles = `<div class="card"><h3>Papéis sugeridos (Random Battle)</h3><p class="mute" style="margin:0 0 8px">Sets do Pokémon Showdown para batalhas equilibradas${raw[key].level ? ", nível " + raw[key].level : ""}. Boas ideias de função, mas não são específicos da história.</p>${raw[key].roles.map(r => `<div class="set"><b>${esc(ROLE_PT[r.role] || r.role)}</b>
-        <span>Habilidades: ${r.abilities.map(a => esc(nm(ai, a))).join(", ") || "—"}</span>${r.items.length ? `<span>Itens: ${r.items.map(i => esc(nm(ii, i))).join(", ")}</span>` : ""}${r.tera.length ? `<span>Tera: ${r.tera.map(esc).join(", ")}</span>` : ""}
-        <span>Golpes:</span><div>${r.moves.map(mchip).join("")}</div></div>`).join("")}</div>`;
+        <span>Habilidades: ${r.abilities.map(a => esc(nm(ai, a))).join(", ") || "—"}</span>${r.items.length ? `<span>Itens:</span><div class="mvrow">${r.items.map(ichip).join("")}</div>` : ""}${r.tera.length ? `<span>Tera:</span><div class="mvrow">${r.tera.map(t => badge(t.toLowerCase())).join("")}</div>` : ""}
+        <span>Golpes:</span><div class="mvgrid">${r.moves.map(mchip).join("")}</div></div>`).join("")}</div>`;
     }
   } catch (e) {}
 
