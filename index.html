@@ -649,7 +649,7 @@ $("q").addEventListener("keydown", e => { if (e.key === "Enter") show($("q").val
 $("q").addEventListener("change", () => show($("q").value));
 
 j(`${POKEAPI}/pokemon?limit=1100`).then(d => { $("names").innerHTML = d.results.map(r => `<option value="${esc(pretty(r.name))}">`).join(""); }).catch(() => {});
-$("foot").innerHTML = 'Sprites animados do <a href="https://play.pokemonshowdown.com" target="_blank" rel="noopener">Pokémon Showdown</a>. Dados: <a href="https://pokeapi.co" target="_blank" rel="noopener">PokéAPI</a> e estatísticas do <a href="https://www.smogon.com/stats/" target="_blank" rel="noopener">Smogon</a>.';
+$("foot").innerHTML = '<b>Créditos</b><br>Estatísticas de uso, sets e estratégias: <a href="https://www.smogon.com" target="_blank" rel="noopener">Smogon</a> (<a href="https://www.smogon.com/stats/" target="_blank" rel="noopener">stats</a> e <a href="https://www.smogon.com/dex/" target="_blank" rel="noopener">Strategy Dex</a>), reunidos em formato aberto pelo projeto <a href="https://github.com/pkmn" target="_blank" rel="noopener">pkmn</a>. Sets do Random Battle e sprites animados: <a href="https://play.pokemonshowdown.com" target="_blank" rel="noopener">Pokémon Showdown</a>. Pokémon, golpes, itens, locais e imagens: <a href="https://pokeapi.co" target="_blank" rel="noopener">PokéAPI</a>. Tradução automática: <a href="https://mymemory.translated.net" target="_blank" rel="noopener">MyMemory</a>.<br>Projeto de fã, não oficial e sem vínculo com Nintendo, Game Freak, The Pokémon Company ou Smogon. Pokémon e seus nomes são marcas dos respectivos donos.';
 </script>
 </body>
 </html>
