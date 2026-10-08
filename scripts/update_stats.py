@@ -10,7 +10,7 @@ KINDS = {
     # VGC dos jogos principais (Scarlet/Violet): procura ate 36 meses para tras
     "vgcsv": (r"^(gen9vgc\d{4}reg[a-z]+)-(\d+)\.json$", [1630, 1760, 1500, 0], 36),
 }
-LIMITS = {"Abilities": 3, "Items": 6, "Moves": 8, "Spreads": 5, "Teammates": 10}
+LIMITS = {"Abilities": 4, "Items": 10, "Moves": 16, "Spreads": 5, "Teammates": 10}
 
 
 def get(url):
