@@ -89,6 +89,7 @@ select{font:inherit;font-size:.85rem;padding:5px 8px;border-radius:8px;border:1p
 .sc[open]>summary{margin-bottom:4px}
 .mvchip small{color:var(--acc);margin-left:4px;font-weight:600}
 .layout.solo{grid-template-columns:1fr}
+.tip{font-size:.82rem;margin:6px 0 4px;line-height:1.45}
 .chip{margin:0}
 .sc{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:0 0 10px}
 .sc>b{font-size:.95rem}
@@ -206,7 +207,7 @@ async function competitive(kind) {
       Promise.all(abils.map(a => look("ability", ai, a.k)))]);
     const cap = k => k.charAt(0).toUpperCase() + k.slice(1);
     const mRows = moves.map((m, x) => { const r = md[x]; return line(r ? `${badge(r.o.type.name)}${cls(r.o.damage_class.name)}<b>${esc(enName(r.o, pretty(r.s)))}</b>` : `<b>${esc(cap(m.k))}</b>`, m.share); }).join("") || none;
-    const iRows = items.map((i, x) => { const r = idd[x]; const img = r ? (r.o.sprites.default || ITEM_IMG(r.s)) : ""; return line(`${img ? `<img src="${img}" alt="" onerror="this.style.visibility='hidden'">` : ""}<b>${esc(r ? enName(r.o, pretty(r.s)) : cap(i.k))}</b>`, i.share); }).join("") || none;
+    const iRows = items.map((i, x) => { const r = idd[x]; return line(`${itemImg(r && r.s, r && r.o)}<b>${esc(r ? enName(r.o, pretty(r.s)) : cap(i.k))}</b>`, i.share); }).join("") || none;
     const aRows = abils.map((a, x) => { const r = ad[x]; return line(`<b>${esc(r ? enName(r.o, pretty(r.s)) : cap(a.k))}</b>`, a.share); }).join("") || none;
     const sRows = L("Spreads", 4).map(x => {
       const [nat, ev] = x.k.split(":"), v = (ev || "").split("/").map(Number);
@@ -315,7 +316,7 @@ async function casual() {
       await Promise.all([...new Set(raw[key].roles.flatMap(r => r.moves))].map(async k => { const s = mi[norm(k)]; if (!s) return; try { rm[k] = await j(`${POKEAPI}/move/${s}`); } catch (e) {} }));
       const ri = {};
       await Promise.all([...new Set(raw[key].roles.flatMap(r => r.items))].map(async k => { const s = ii[norm(k)]; if (!s) return; try { ri[k] = await j(`${POKEAPI}/item/${s}`); } catch (e) {} }));
-      const ichip = k => { const o = ri[k], s = ii[norm(k)], img = o ? (o.sprites.default || ITEM_IMG(s)) : ""; return `<span class="mvchip">${img ? `<img src="${img}" alt="" style="width:22px;height:22px;image-rendering:pixelated" onerror="this.style.visibility='hidden'">` : ""}${esc(o ? enName(o, nm(ii, k)) : nm(ii, k))}</span>`; };
+      const ichip = k => { const o = ri[k], s = ii[norm(k)], img = o ? (o.sprites.default || ITEM_IMG(s)) : ""; return `<span class="mvchip">${itemImg(s, o)}${esc(o ? enName(o, nm(ii, k)) : nm(ii, k))}</span>`; };
       const mchip = k => { const o = rm[k]; return o ? `<span class="mvchip">${badge(o.type.name)}${cls(o.damage_class.name)}${esc(enName(o, nm(mi, k)))}</span>` : `<span class="mvchip">${esc(nm(mi, k))}</span>`; };
       roles = `<div class="card"><h3>Papéis sugeridos (Random Battle)</h3><p class="mute" style="margin:0 0 8px">Sets do Pokémon Showdown para batalhas equilibradas${raw[key].level ? ", nível " + raw[key].level : ""}. Boas ideias de função, mas não são específicos da história.</p>${raw[key].roles.map(r => `<div class="set"><b>${esc(ROLE_PT[r.role] || r.role)}</b>
         <span>Habilidades: ${r.abilities.map(a => esc(nm(ai, a))).join(", ") || "—"}</span>${r.items.length ? `<span>Itens:</span><div class="mvrow">${r.items.map(ichip).join("")}</div>` : ""}${r.tera.length ? `<span>Tera:</span><div class="mvrow">${r.tera.map(t => badge(t.toLowerCase())).join("")}</div>` : ""}
@@ -330,7 +331,7 @@ async function casual() {
     <div class="card"><h3>Build sugerida</h3>
      <div class="row" style="grid-template-columns:1fr"><span class="nm"><b>Natureza: ${nat}</b></span></div><span class="ev">${natTxt}</span>
      <div class="row" style="grid-template-columns:1fr;margin-top:10px"><span class="nm"><b>EVs: ${evs}</b></span></div>
-     ${itemSlug ? `<div class="row" style="grid-template-columns:1fr;margin-top:10px"><span class="nm"><img src="${ITEM_IMG(itemSlug)}" alt="" onerror="this.style.visibility='hidden'"><b>Item: ${esc(pretty(itemSlug))}</b></span></div>` : ""}
+     ${itemSlug ? `<div class="row" style="grid-template-columns:1fr;margin-top:10px"><span class="nm">${itemImg(itemSlug)}<b>Item: ${esc(pretty(itemSlug))}</b></span></div>` : ""}
     </div>
     <div class="card"><h3>Golpes sugeridos</h3>${chosen.map(x => `<div class="row" style="grid-template-columns:1fr auto"><span class="nm">${badge(x.o.type.name)}${cls(x.o.damage_class.name)}<b>${esc(enName(x.o, pretty(x.o.name)))}</b></span><span class="pc">${x.how} · ${x.o.power}</span></div>`).join("") || none}</div>
     <div class="card"><h3>Habilidades</h3>${abHtml}<span class="ev">Descrições traduzidas automaticamente.</span></div>
@@ -492,7 +493,89 @@ function setsFor(raw, name) {
   return byTier;
 }
 
-async function setCards(blocks, usage) {
+// ---- Ícones de item com várias fontes e ícone padrão ----
+const NOICON = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='12' r='8' fill='%232c3246' stroke='%238d96b0' stroke-width='2'/><circle cx='12' cy='12' r='2.5' fill='%238d96b0'/></svg>";
+function nextImg(el) {
+  const l = (el.dataset.fb || "").split("|").filter(Boolean), n = l.shift();
+  if (!n) { el.onerror = null; el.src = NOICON; return; }
+  el.dataset.fb = l.join("|"); el.src = n;
+}
+function itemImg(slug, o) {
+  if (!slug) return `<img src="${NOICON}" alt="" style="width:22px;height:22px">`;
+  const l = [o && o.sprites && o.sprites.default, ITEM_IMG(slug), `https://img.pokemondb.net/sprites/items/${slug}.png`].filter(Boolean);
+  return `<img src="${l[0]}" data-fb="${l.slice(1).join("|")}" alt="" onerror="nextImg(this)" style="width:22px;height:22px;image-rendering:pixelated">`;
+}
+
+// ---- Dica automática de "como usar", gerada a partir dos golpes, item, habilidade e Tera do set ----
+const MVG = {
+  setup: ["Swords Dance", "Dragon Dance", "Nasty Plot", "Calm Mind", "Quiver Dance", "Bulk Up", "Shell Smash", "Belly Drum", "Agility", "Rock Polish", "Curse", "Coil", "Work Up", "Growth", "Tail Glow", "Geomancy", "Victory Dance", "Clangorous Soul", "Tidy Up", "Hone Claws", "Cosmic Power", "Iron Defense", "Amnesia", "Acid Armor", "Shift Gear", "No Retreat"],
+  recover: ["Recover", "Roost", "Soft-Boiled", "Slack Off", "Synthesis", "Moonlight", "Morning Sun", "Milk Drink", "Wish", "Shore Up", "Heal Order", "Rest", "Strength Sap", "Life Dew", "Jungle Healing", "Lunar Blessing"],
+  hazards: ["Stealth Rock", "Spikes", "Toxic Spikes", "Sticky Web"],
+  removal: ["Defog", "Rapid Spin", "Mortal Spin", "Court Change"],
+  pivot: ["U-turn", "Volt Switch", "Flip Turn", "Parting Shot", "Teleport", "Baton Pass", "Chilly Reception", "Shed Tail"],
+  status: ["Will-O-Wisp", "Thunder Wave", "Toxic", "Spore", "Sleep Powder", "Hypnosis", "Glare", "Stun Spore", "Yawn", "Nuzzle", "Toxic Thread", "Leech Seed"],
+  screens: ["Reflect", "Light Screen", "Aurora Veil"],
+  speed: ["Icy Wind", "Electroweb", "Tailwind", "Trick Room"],
+  protect: ["Protect", "Detect", "King's Shield", "Spiky Shield", "Baneful Bunker", "Obstruct", "Silk Trap", "Burning Bulwark"],
+  support: ["Fake Out", "Follow Me", "Rage Powder", "Helping Hand", "Wide Guard", "Quick Guard", "Ally Switch", "Coaching", "After You"],
+  priority: ["Extreme Speed", "Sucker Punch", "Aqua Jet", "Bullet Punch", "Ice Shard", "Mach Punch", "Shadow Sneak", "Accelerock", "Quick Attack", "First Impression", "Jet Punch", "Thunderclap", "Grassy Glide"]
+};
+const ITEM_TIP = {
+  "Choice Band": "Choice Band aumenta o Ataque, mas trava no primeiro golpe escolhido: troque de Pokémon para mudar de golpe.",
+  "Choice Specs": "Choice Specs aumenta o Ataque Especial, mas trava no primeiro golpe escolhido: troque de Pokémon para mudar de golpe.",
+  "Choice Scarf": "Choice Scarf aumenta a Velocidade, para ultrapassar adversários rápidos, mas trava no primeiro golpe escolhido.",
+  "Life Orb": "Life Orb aumenta o dano, mas tira um pouco de vida a cada ataque.",
+  "Leftovers": "Leftovers recupera um pouco de vida a cada turno.",
+  "Assault Vest": "Assault Vest aumenta a Defesa Especial, mas impede o uso de golpes de status.",
+  "Heavy-Duty Boots": "Heavy-Duty Boots impede o dano de armadilhas (como Stealth Rock) ao entrar em campo.",
+  "Focus Sash": "Focus Sash garante sobreviver a um golpe que derrubaria o Pokémon com a vida cheia.",
+  "Rocky Helmet": "Rocky Helmet machuca quem atacar com golpes de contato.",
+  "Sitrus Berry": "Sitrus Berry recupera vida quando ela cai pela metade.",
+  "Booster Energy": "Booster Energy ativa Protosynthesis ou Quark Drive sem depender de clima ou terreno.",
+  "Clear Amulet": "Clear Amulet impede que o adversário reduza seus atributos (como com Intimidate).",
+  "Covert Cloak": "Covert Cloak bloqueia efeitos adicionais de golpes do adversário.",
+  "Safety Goggles": "Safety Goggles protege contra golpes de pó e contra o dano de clima.",
+  "Light Clay": "Light Clay estende a duração das telas (Reflect, Light Screen, Aurora Veil).",
+  "Eviolite": "Eviolite aumenta as defesas de Pokémon que ainda podem evoluir.",
+  "Weakness Policy": "Weakness Policy aumenta Ataque e Ataque Especial quando o Pokémon leva um golpe super efetivo.",
+  "Expert Belt": "Expert Belt aumenta o dano de golpes super efetivos."
+};
+const ABIL_TIP = {
+  "Intimidate": "Intimidate reduz o Ataque dos adversários ao entrar: bom para trocar no momento certo.",
+  "Regenerator": "Regenerator recupera vida ao sair de campo: ótimo para trocar várias vezes.",
+  "Protosynthesis": "Protosynthesis aumenta o melhor atributo sob sol forte ou com Booster Energy.",
+  "Quark Drive": "Quark Drive aumenta o melhor atributo em terreno elétrico ou com Booster Energy.",
+  "Drought": "Drought ativa sol ao entrar, reforçando golpes de fogo.",
+  "Drizzle": "Drizzle ativa chuva ao entrar, reforçando golpes de água.",
+  "Sand Stream": "Sand Stream ativa tempestade de areia ao entrar.",
+  "Snow Warning": "Snow Warning ativa neve ao entrar.",
+  "Prankster": "Prankster dá prioridade a golpes de status.",
+  "Good as Gold": "Good as Gold deixa o Pokémon imune a golpes de status do adversário."
+};
+function howTo(s) {
+  const mv = s.moves.flatMap(splitSlash), f = k => mv.filter(m => MVG[k].includes(m)), L = a => a.join(", ");
+  const setup = f("setup"), haz = f("hazards"), rem = f("removal"), scr = f("screens"), st = f("status"), spd = f("speed"), sup = f("support"), prot = f("protect"), piv = f("pivot"), rec = f("recover"), pri = f("priority");
+  const out = [];
+  if (setup.length) out.push(`Use ${L(setup)} quando houver espaço (depois de um KO ou contra adversários que não o ameacem) e depois elimine o time inimigo com os golpes de ataque.`);
+  if (haz.length) out.push(`Coloque ${L(haz)} logo no começo para desgastar o time adversário.`);
+  if (rem.length) out.push(`${L(rem)} remove armadilhas do seu lado do campo.`);
+  if (scr.length) out.push(`${L(scr)} reduz o dano recebido por alguns turnos: use ao entrar, antes de o adversário atacar.`);
+  if (st.length) out.push(`${L(st)} enfraquece ou paralisa o adversário e abre espaço para o time.`);
+  if (spd.length) out.push(`${L(spd)} controla a velocidade da batalha.`);
+  if (sup.length) out.push(`${L(sup)} ajuda o parceiro, principalmente em batalhas em dupla.`);
+  if (prot.length) out.push(`${prot[0]} protege por um turno: serve para ganhar informação e fazer o adversário gastar o ataque.`);
+  if (piv.length) out.push(`${L(piv)} permite trocar de Pokémon mantendo a pressão.`);
+  if (rec.length) out.push(`${L(rec)} recupera vida e faz o Pokémon durar mais.`);
+  if (pri.length) out.push(`${L(pri)} ataca antes dos outros e serve para finalizar adversários enfraquecidos.`);
+  const it = splitSlash(s.item).map(i => ITEM_TIP[i]).find(Boolean), ab = splitSlash(s.ability).map(a => ABIL_TIP[a]).find(Boolean);
+  if (it) out.push(it);
+  if (ab) out.push(ab);
+  if (s.tera) out.push(`Terastalize na hora certa (${s.tera}) para mudar a defesa ou reforçar os golpes desse tipo.`);
+  return out.slice(0, 5).join(" ");
+}
+const dexUrl = (g, name, tier) => `https://www.smogon.com/dex/${DEXCODE[g]}/pokemon/${slug(name)}/${["ubers", "ou", "uu", "ru", "nu", "pu", "zu", "lc"].includes(tier) ? tier + "/" : ""}`;
+
+async function setCards(blocks, usage, dex) {
   usage = usage || {};
   const pc = (map, n) => map && map[norm(n)] != null ? `<small>${pct(map[norm(n)])}</small>` : "";
   const [mi, ii] = await Promise.all([index("move"), index("item")]);
@@ -502,9 +585,9 @@ async function setCards(blocks, usage) {
   await Promise.all([...mv].map(async n => { const sl = mi[norm(n)]; if (sl) try { md[n] = await j(`${POKEAPI}/move/${sl}`); } catch (e) {} }));
   await Promise.all([...it].map(async n => { const sl = ii[norm(n)]; if (sl) try { itd[n] = await j(`${POKEAPI}/item/${sl}`); } catch (e) {} }));
   const mchip = n => { const o = md[n]; return `<span class="mvchip">${o ? badge(o.type.name) + cls(o.damage_class.name) : ""}${esc(n)}${pc(usage.m, n)}</span>`; };
-  const ichip = n => { const o = itd[n], img = o ? (o.sprites.default || ITEM_IMG(ii[norm(n)])) : ""; return `<span class="mvchip">${img ? `<img src="${img}" alt="" style="width:22px;height:22px;image-rendering:pixelated" onerror="this.style.visibility='hidden'">` : ""}${esc(n)}${pc(usage.i, n)}</span>`; };
+  const ichip = n => { const o = itd[n], img = o ? (o.sprites.default || ITEM_IMG(ii[norm(n)])) : ""; return `<span class="mvchip">${itemImg(ii[norm(n)], o)}${esc(n)}${pc(usage.i, n)}</span>`; };
   const row = (label, html) => html ? `<div class="kv"><span class="mute">${label}</span><div class="mvrow" style="margin:0">${html}</div></div>` : "";
-  return blocks.map((b, bi) => (blocks.length > 1 ? `<h4>${esc(b.form)}</h4>` : "") + b.sets.map((s, si) => `<details class="sc"${bi === 0 && si === 0 ? " open" : ""}><summary><b>${esc(s.name)}</b></summary>
+  return blocks.map((b, bi) => (blocks.length > 1 ? `<h4>${esc(b.form)}</h4>` : "") + b.sets.map((s, si) => `<details class="sc"${bi === 0 && si === 0 ? " open" : ""}><summary><b>${esc(s.name)}</b></summary>${(() => { const t = howTo(s); return `<p class="tip">${t ? `<span class="mute">Como usar (dica automática):</span> ${esc(t)} ` : ""}${dex ? `<a href="${dex}" target="_blank" rel="noopener">Explicação completa no Smogon ↗</a>` : ""}</p>`; })()}
     <div class="sg"><div>${s.moves.map((m, i) => row("Golpe " + (i + 1), splitSlash(m).map(mchip).join('<span class="mute">/</span>'))).join("")}</div>
     <div>${row("Item", splitSlash(s.item).map(ichip).join('<span class="mute">/</span>'))}${row("Habilidade", splitSlash(s.ability).map(a => `<span class="mvchip">${esc(a)}${pc(usage.a, a)}</span>`).join('<span class="mute">/</span>'))}${row("Natureza", esc(s.nature))}${row("EVs", esc(s.evs))}${row("IVs", esc(s.ivs || ""))}${row("Tera", splitSlash(s.tera).map(t => badge(t.toLowerCase())).join(""))}</div></div></details>`).join("")).join("");
 }
@@ -521,7 +604,7 @@ async function stratCard(genKey, keep, usage) {
   if (!tiers.length) return `<div class="card"><h3>Estratégias (Smogon) · ${esc(gl)}</h3><p class="mute" style="margin:0">Sem sets do Smogon para este Pokémon neste formato.</p>${link}</div>`;
   if (!tiers.includes(stier)) stier = tiers[0];
   const tnav = tiers.length > 1 ? `<div class="gnav"><span class="mute">Formato:</span>${tiers.map(t => `<button class="chip${t === stier ? " on" : ""}" data-st="${t}">${esc(tierName(t))}</button>`).join("")}</div>` : "";
-  return `<div class="card"><h3>Estratégias (Smogon) · ${esc(gl)} · ${esc(tierName(stier))}</h3>${tnav}${await setCards(byTier[stier], usage)}${link}</div>`;
+  return `<div class="card"><h3>Estratégias (Smogon) · ${esc(gl)} · ${esc(tierName(stier))}</h3>${tnav}${await setCards(byTier[stier], usage, dexUrl(genKey, name, stier))}${link}</div>`;
 }
 
 // Aba para consultar outras gerações (RB, GS, ... SV, Champions).
