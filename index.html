@@ -60,7 +60,7 @@ h4{margin:14px 0 8px;font-size:.85rem;font-weight:600;color:var(--acc)}
 .mvchip .ci{width:18px;height:18px}
 .hd{padding:12px 14px}
 .top{display:flex;align-items:center;gap:12px}
-.top img{width:84px;height:84px;object-fit:contain}
+.top img{width:96px;height:96px;object-fit:contain}
 .hr h2{margin:0 0 4px;font-size:1.3rem;font-weight:700}
 .hr h2 small{font-size:.8rem;font-weight:400}
 .mid{display:grid;grid-template-columns:230px 1fr;gap:16px;margin-top:10px;align-items:start}
@@ -82,7 +82,14 @@ select{font:inherit;font-size:.85rem;padding:5px 8px;border-radius:8px;border:1p
 @media(max-width:560px){.mid{grid-template-columns:1fr}.bubble::before,.bubble::after{display:none}.loc{flex-direction:column;gap:0}}
 .chip.on{background:var(--acc);color:var(--accink);border-color:var(--acc);font-weight:600}
 .gnav{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 10px}
-.gnav .chip{margin:0}
+.gnav .sc summary{cursor:pointer;list-style:none}
+.sc summary::-webkit-details-marker{display:none}
+.sc summary::before{content:"▸ ";color:var(--mute)}
+.sc[open]>summary::before{content:"▾ "}
+.sc[open]>summary{margin-bottom:4px}
+.mvchip small{color:var(--acc);margin-left:4px;font-weight:600}
+.layout.solo{grid-template-columns:1fr}
+.chip{margin:0}
 .sc{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:0 0 10px}
 .sc>b{font-size:.95rem}
 .sg{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px}
@@ -115,7 +122,7 @@ const GAME = "scarlet-violet";
 
 const NS = ["PS","Atq","Def","SpA","SpD","Vel"];
 const TC = {normal:"#9fa19f",fire:"#e8622a",water:"#4592e6",electric:"#e8b800",grass:"#3fa129",ice:"#3dcef3",fighting:"#d3425f",poison:"#9f5bd0",ground:"#a97a4a",flying:"#7fa4e8",psychic:"#ee6b7a",bug:"#8fa31b",rock:"#b8a86e",ghost:"#6c5aa8",dragon:"#4f60e2",dark:"#5b5466",steel:"#5a8ea5",fairy:"#ee90e6"};
-const MODES = [["vgc","VGC Champions"],["vgcsv","VGC Scarlet/Violet"],["singles","Singles"],["casual","Casual"],["strat","Estratégias"]];
+const MODES = [["comp","Competitivo"],["casual","Casual"],["strat","Outras gerações"]];
 const $ = id => document.getElementById(id);
 const cache = new Map();
 const j = async u => { if (cache.has(u)) return cache.get(u); const r = await fetch(u); if (!r.ok) throw new Error(r.status); const d = await r.json(); cache.set(u, d); return d; };
@@ -156,7 +163,7 @@ async function tr(t) {
 function translateAll(root, my) {
   root.querySelectorAll("[data-tr]").forEach(el => { const txt = el.dataset.tr; tr(txt).then(v => { if (renderTab.id === my && el.dataset.tr === txt) el.textContent = v; }); });
 }
-let game = "", mon = null, mode = "vgc";
+let game = "", mon = null, mode = "comp", cfmt = "vgc";
 
 /* ---------- Dados competitivos ---------- */
 const pick = (o, ...ks) => { for (const k of ks) if (o && o[k]) return o[k]; return {}; };
@@ -179,39 +186,51 @@ const pct = x => Math.round(x * 100) + "%";
 const line = (nm, share) => `<div class="row"><span class="nm">${nm}</span><div class="bar"><i style="width:${Math.round(share * 100)}%"></i></div><span class="pc">${pct(share)}</span></div>`;
 const none = '<p class="mute">Sem dados.</p>';
 
+const CFMTS = [["vgc", "VGC Champions"], ["vgcsv", "VGC Scarlet/Violet"], ["singles", "Singles"]];
 async function competitive(kind) {
-  const { format, d } = await loadStats(kind, pretty(mon.name));
-  const n = d.n, L = (key, c) => topN(pick(d, key, key.toLowerCase()), c, n);
-  const moves = L("Moves", 8), items = L("Items", 6), abils = L("Abilities", 3);
-  const [mi, ii, ai] = await Promise.all([index("move"), index("item"), index("ability")]);
-  const look = async (kind, map, key) => { const s = map[norm(key)]; if (!s) return null; try { return { s, o: await j(`${POKEAPI}/${kind}/${s}`) }; } catch (e) { return null; } };
-  const [md, idd, ad] = await Promise.all([
-    Promise.all(moves.map(m => look("move", mi, m.k))),
-    Promise.all(items.map(i => look("item", ii, i.k))),
-    Promise.all(abils.map(a => look("ability", ai, a.k)))]);
-  const cap = k => k.charAt(0).toUpperCase() + k.slice(1);
-  const mRows = moves.map((m, x) => { const r = md[x]; return line(r ? `${badge(r.o.type.name)}${cls(r.o.damage_class.name)}<b>${esc(enName(r.o, pretty(r.s)))}</b>` : `<b>${esc(cap(m.k))}</b>`, m.share); }).join("") || none;
-  const iRows = items.map((i, x) => { const r = idd[x]; const img = r ? (r.o.sprites.default || ITEM_IMG(r.s)) : ""; return line(`${img ? `<img src="${img}" alt="" onerror="this.style.visibility='hidden'">` : ""}<b>${esc(r ? enName(r.o, pretty(r.s)) : cap(i.k))}</b>`, i.share); }).join("") || none;
-  const aRows = abils.map((a, x) => { const r = ad[x]; return line(`<b>${esc(r ? enName(r.o, pretty(r.s)) : cap(a.k))}</b>`, a.share); }).join("") || none;
-  const sRows = L("Spreads", 4).map(x => {
-    const [nat, ev] = x.k.split(":"), v = (ev || "").split("/").map(Number);
-    const evs = v.map((q, i) => q ? q + " " + NS[i] : "").filter(Boolean).join(" / ");
-    return line(`<span style="display:block;min-width:0"><b>${esc(nat)}</b><span class="ev">${esc(evs)}</span></span>`, x.share);
-  }).join("") || none;
-  const mateList = L("Teammates", 10);
-  const sprites = await Promise.all(mateList.map(x => sprite(x.k)));
-  const mates = mateList.map((x, i) => `<button class="mate" data-n="${esc(x.k)}">${sprites[i] ? `<img src="${sprites[i]}" alt="">` : '<i class="ph"></i>'}<span class="mn">${esc(x.k)}</span><small>${pct(x.share)}</small></button>`).join("") || none;
-  const strat = await stratCard(kind === "vgc" ? "champions" : "9", kind === "singles" ? (t => SINGLES_TIERS.includes(t)) : (t => /^vgc/.test(t)));
-  return `<div class="layout"><div>
-  <p class="mute">Fonte: estatísticas do Smogon, formato ${esc(format)}.</p>
+  const nav = `<div class="gnav"><span class="mute">Formato:</span>${CFMTS.map(([k, l]) => `<button class="chip${k === kind ? " on" : ""}" data-cf="${k}">${l}</button>`).join("")}</div>`;
+  const genKey = kind === "vgc" ? "champions" : "9";
+  const keep = kind === "singles" ? (t => SINGLES_TIERS.includes(t)) : (t => /^vgc/.test(t));
+  let st; try { st = await loadStats(kind, pretty(mon.name)); } catch (e) { st = { err: e.message }; }
+  let left = "", aside = "", usage = null;
+  if (st.d) {
+    const d = st.d, n = d.n, L = (key, c) => topN(pick(d, key, key.toLowerCase()), c, n);
+    const share = key => Object.fromEntries(L(key, 99).map(x => [norm(x.k), x.share]));
+    usage = { m: share("Moves"), i: share("Items"), a: share("Abilities") };
+    const moves = L("Moves", 8), items = L("Items", 6), abils = L("Abilities", 3);
+    const [mi, ii, ai] = await Promise.all([index("move"), index("item"), index("ability")]);
+    const look = async (k2, map, key) => { const s = map[norm(key)]; if (!s) return null; try { return { s, o: await j(`${POKEAPI}/${k2}/${s}`) }; } catch (e) { return null; } };
+    const [md, idd, ad] = await Promise.all([
+      Promise.all(moves.map(m => look("move", mi, m.k))),
+      Promise.all(items.map(i => look("item", ii, i.k))),
+      Promise.all(abils.map(a => look("ability", ai, a.k)))]);
+    const cap = k => k.charAt(0).toUpperCase() + k.slice(1);
+    const mRows = moves.map((m, x) => { const r = md[x]; return line(r ? `${badge(r.o.type.name)}${cls(r.o.damage_class.name)}<b>${esc(enName(r.o, pretty(r.s)))}</b>` : `<b>${esc(cap(m.k))}</b>`, m.share); }).join("") || none;
+    const iRows = items.map((i, x) => { const r = idd[x]; const img = r ? (r.o.sprites.default || ITEM_IMG(r.s)) : ""; return line(`${img ? `<img src="${img}" alt="" onerror="this.style.visibility='hidden'">` : ""}<b>${esc(r ? enName(r.o, pretty(r.s)) : cap(i.k))}</b>`, i.share); }).join("") || none;
+    const aRows = abils.map((a, x) => { const r = ad[x]; return line(`<b>${esc(r ? enName(r.o, pretty(r.s)) : cap(a.k))}</b>`, a.share); }).join("") || none;
+    const sRows = L("Spreads", 4).map(x => {
+      const [nat, ev] = x.k.split(":"), v = (ev || "").split("/").map(Number);
+      const evs = v.map((q, i) => q ? q + " " + NS[i] : "").filter(Boolean).join(" / ");
+      return line(`<span style="display:block;min-width:0"><b>${esc(nat)}</b><span class="ev">${esc(evs)}</span></span>`, x.share);
+    }).join("") || none;
+    const mateList = L("Teammates", 10);
+    const sprites = await Promise.all(mateList.map(x => sprite(x.k)));
+    const mates = mateList.map((x, i) => `<button class="mate" data-n="${esc(x.k)}">${sprites[i] ? `<img src="${sprites[i]}" alt="">` : '<i class="ph"></i>'}<span class="mn">${esc(x.k)}</span><small>${pct(x.share)}</small></button>`).join("") || none;
+    left = `<p class="mute">Uso: estatísticas do Smogon, formato ${esc(st.format)}.</p>
   <div class="grid">
    <div class="card"><h3>Golpes</h3>${mRows}</div>
    <div class="card"><h3>Itens</h3>${iRows}</div>
    <div class="card"><h3>Habilidades</h3>${aRows}</div>
    <div class="card"><h3>${kind === "vgc" ? "Natureza e pontos de status" : "Natureza e EVs"}</h3>${kind === "vgc" ? '<p class="mute" style="margin:0 0 6px">No Champions não há EVs: cada status recebe até 32 pontos, somando no máximo 66.</p>' : ""}${sRows}</div>
-  </div>${strat}</div>
-  <aside class="card"><h3>Companheiros de time</h3>${mates}</aside></div>`;
+  </div>`;
+    aside = `<aside class="card"><h3>Companheiros de time</h3>${mates}</aside>`;
+  } else {
+    left = `<div class="card"><p class="mute" style="margin:0">Sem estatísticas de uso para este Pokémon neste formato (${esc(st.err)}).</p></div>`;
+  }
+  const strat = await stratCard(genKey, keep, usage);
+  return `${nav}<div class="layout${aside ? "" : " solo"}"><div>${left}${strat}</div>${aside}</div>`;
 }
+
 
 /* ---------- Modo casual (calculado com a PokéAPI) ---------- */
 const NAT = { "phys": ["Adamant", "+Atq −SpA"], "phys-fast": ["Jolly", "+Vel −SpA"], "spec": ["Modest", "+SpA −Atq"], "spec-fast": ["Timid", "+Vel −Atq"] };
@@ -368,10 +387,16 @@ function versionsWithData() {
   mon.enc.forEach(l => l.version_details.forEach(v => set.add(v.version.name)));
   return set;
 }
+const ANIM_GENS = ["VI", "VII", "VIII", "IX"];
 function artFor(g) {
   const s = mon.sprites, e = g && SPR[g.vs[0]], v = e && s.versions && s.versions[e[0]] && s.versions[e[0]][e[1]];
-  if (v) { const a = (v.animated && v.animated.front_default) || v.front_default; if (a) return [a, true]; }
-  return [((s.other || {})["official-artwork"] || {}).front_default || ((s.other || {}).home || {}).front_default || s.front_default, false];
+  const still = ((s.other || {})["official-artwork"] || {}).front_default || ((s.other || {}).home || {}).front_default || s.front_default;
+  if (g && ANIM_GENS.includes(g.gen)) {
+    const n = mon.name, base = "https://play.pokemonshowdown.com/sprites/ani/";
+    return [[base + n + ".gif", base + n.replace(/-/g, "") + ".gif", base + n.split("-")[0] + ".gif", still], false];
+  }
+  if (v) { const a = (v.animated && v.animated.front_default) || v.front_default; if (a) return [[a, still], true]; }
+  return [[still], false];
 }
 function descFor(g) {
   const fl = mon.sp ? mon.sp.flavor_text_entries.filter(e => e.language.name === "en") : [];
@@ -411,8 +436,9 @@ async function availSpecies(g) {
   return ids.size ? (availCache[g.id] = ids) : null;
 }
 async function renderGame() {
-  const my = (renderGame.n = (renderGame.n || 0) + 1), g = G(), [src, pix] = artFor(g), img = $("art");
-  img.src = src; img.style.imageRendering = pix ? "pixelated" : "auto";
+  const my = (renderGame.n = (renderGame.n || 0) + 1), g = G(), [srcs, pix] = artFor(g), img = $("art");
+  let k = 0; img.onerror = () => { k++; if (k < srcs.length) img.src = srcs[k]; else img.onerror = null; };
+  img.src = srcs[0]; img.style.imageRendering = pix ? "pixelated" : "auto";
   const d = descFor(g), el = $("desc");
   el.dataset.tr = d; el.textContent = d;
   if (d) translateAll($("hdr"), renderTab.id);
@@ -466,23 +492,25 @@ function setsFor(raw, name) {
   return byTier;
 }
 
-async function setCards(blocks) {
+async function setCards(blocks, usage) {
+  usage = usage || {};
+  const pc = (map, n) => map && map[norm(n)] != null ? `<small>${pct(map[norm(n)])}</small>` : "";
   const [mi, ii] = await Promise.all([index("move"), index("item")]);
   const mv = new Set(), it = new Set();
   blocks.forEach(b => b.sets.forEach(s => { s.moves.forEach(m => splitSlash(m).forEach(x => mv.add(x))); splitSlash(s.item).forEach(x => it.add(x)); }));
   const md = {}, itd = {};
   await Promise.all([...mv].map(async n => { const sl = mi[norm(n)]; if (sl) try { md[n] = await j(`${POKEAPI}/move/${sl}`); } catch (e) {} }));
   await Promise.all([...it].map(async n => { const sl = ii[norm(n)]; if (sl) try { itd[n] = await j(`${POKEAPI}/item/${sl}`); } catch (e) {} }));
-  const mchip = n => { const o = md[n]; return `<span class="mvchip">${o ? badge(o.type.name) + cls(o.damage_class.name) : ""}${esc(n)}</span>`; };
-  const ichip = n => { const o = itd[n], img = o ? (o.sprites.default || ITEM_IMG(ii[norm(n)])) : ""; return `<span class="mvchip">${img ? `<img src="${img}" alt="" style="width:22px;height:22px;image-rendering:pixelated" onerror="this.style.visibility='hidden'">` : ""}${esc(n)}</span>`; };
+  const mchip = n => { const o = md[n]; return `<span class="mvchip">${o ? badge(o.type.name) + cls(o.damage_class.name) : ""}${esc(n)}${pc(usage.m, n)}</span>`; };
+  const ichip = n => { const o = itd[n], img = o ? (o.sprites.default || ITEM_IMG(ii[norm(n)])) : ""; return `<span class="mvchip">${img ? `<img src="${img}" alt="" style="width:22px;height:22px;image-rendering:pixelated" onerror="this.style.visibility='hidden'">` : ""}${esc(n)}${pc(usage.i, n)}</span>`; };
   const row = (label, html) => html ? `<div class="kv"><span class="mute">${label}</span><div class="mvrow" style="margin:0">${html}</div></div>` : "";
-  return blocks.map(b => (blocks.length > 1 ? `<h4>${esc(b.form)}</h4>` : "") + b.sets.map(s => `<div class="sc"><b>${esc(s.name)}</b>
+  return blocks.map((b, bi) => (blocks.length > 1 ? `<h4>${esc(b.form)}</h4>` : "") + b.sets.map((s, si) => `<details class="sc"${bi === 0 && si === 0 ? " open" : ""}><summary><b>${esc(s.name)}</b></summary>
     <div class="sg"><div>${s.moves.map((m, i) => row("Golpe " + (i + 1), splitSlash(m).map(mchip).join('<span class="mute">/</span>'))).join("")}</div>
-    <div>${row("Item", splitSlash(s.item).map(ichip).join('<span class="mute">/</span>'))}${row("Habilidade", esc(s.ability))}${row("Natureza", esc(s.nature))}${row("EVs", esc(s.evs))}${row("IVs", esc(s.ivs || ""))}${row("Tera", splitSlash(s.tera).map(t => badge(t.toLowerCase())).join(""))}</div></div></div>`).join("")).join("");
+    <div>${row("Item", splitSlash(s.item).map(ichip).join('<span class="mute">/</span>'))}${row("Habilidade", splitSlash(s.ability).map(a => `<span class="mvchip">${esc(a)}${pc(usage.a, a)}</span>`).join('<span class="mute">/</span>'))}${row("Natureza", esc(s.nature))}${row("EVs", esc(s.evs))}${row("IVs", esc(s.ivs || ""))}${row("Tera", splitSlash(s.tera).map(t => badge(t.toLowerCase())).join(""))}</div></div></details>`).join("")).join("");
 }
 
 // Cartão de estratégias do Smogon. genKey: "1".."9" ou "champions"; keep: quais formatos mostrar.
-async function stratCard(genKey, keep) {
+async function stratCard(genKey, keep, usage) {
   const name = pretty(mon.name), gl = (SGENS.find(x => x[0] === genKey) || [0, genKey])[1];
   const link = `<p class="mute" style="margin:6px 0 0">Análise completa no <a href="https://www.smogon.com/dex/${DEXCODE[genKey]}/pokemon/${slug(name)}/" target="_blank" rel="noopener">Smogon Strategy Dex</a>.</p>`;
   let raw = null;
@@ -493,7 +521,7 @@ async function stratCard(genKey, keep) {
   if (!tiers.length) return `<div class="card"><h3>Estratégias (Smogon) · ${esc(gl)}</h3><p class="mute" style="margin:0">Sem sets do Smogon para este Pokémon neste formato.</p>${link}</div>`;
   if (!tiers.includes(stier)) stier = tiers[0];
   const tnav = tiers.length > 1 ? `<div class="gnav"><span class="mute">Formato:</span>${tiers.map(t => `<button class="chip${t === stier ? " on" : ""}" data-st="${t}">${esc(tierName(t))}</button>`).join("")}</div>` : "";
-  return `<div class="card"><h3>Estratégias (Smogon) · ${esc(gl)} · ${esc(tierName(stier))}</h3>${tnav}${await setCards(byTier[stier])}${link}</div>`;
+  return `<div class="card"><h3>Estratégias (Smogon) · ${esc(gl)} · ${esc(tierName(stier))}</h3>${tnav}${await setCards(byTier[stier], usage)}${link}</div>`;
 }
 
 // Aba para consultar outras gerações (RB, GS, ... SV, Champions).
@@ -505,7 +533,7 @@ async function stratTab() {
 async function renderTab() {
   const t = $("tab"), my = ++renderTab.id; t.innerHTML = '<p class="mute">Carregando…</p>';
   let html;
-  try { html = mode === "casual" ? await casual() : mode === "strat" ? await stratTab() : await competitive(mode); }
+  try { html = mode === "casual" ? await casual() : mode === "strat" ? await stratTab() : await competitive(cfmt); }
   catch (e) { html = `<div class="card">Não foi possível carregar os dados competitivos (${esc(e.message)}). Veja direto no <a href="https://www.pikalytics.com/pokedex" target="_blank" rel="noopener">Pikalytics</a>.</div>`; }
   if (my === renderTab.id) { t.innerHTML = html; translateAll(t, my); }
 }
@@ -527,6 +555,8 @@ document.addEventListener("change", e => { if (e.target.id === "game") { game = 
 document.addEventListener("click", e => {
   const n = e.target.closest("[data-n]"), t = e.target.closest("[data-m]");
   if (n) show(n.dataset.n);
+  const cf = e.target.closest("[data-cf]");
+  if (cf) { cfmt = cf.dataset.cf; stier = null; renderTab(); }
   const sg = e.target.closest("[data-sg]"), st = e.target.closest("[data-st]");
   if (sg) { sgen = sg.dataset.sg; stier = null; renderTab(); }
   if (st) { stier = st.dataset.st; renderTab(); }
@@ -536,7 +566,7 @@ $("q").addEventListener("keydown", e => { if (e.key === "Enter") show($("q").val
 $("q").addEventListener("change", () => show($("q").value));
 
 j(`${POKEAPI}/pokemon?limit=1100`).then(d => { $("names").innerHTML = d.results.map(r => `<option value="${esc(pretty(r.name))}">`).join(""); }).catch(() => {});
-$("foot").innerHTML = 'Dados: <a href="https://pokeapi.co" target="_blank" rel="noopener">PokéAPI</a> e estatísticas do <a href="https://www.smogon.com/stats/" target="_blank" rel="noopener">Smogon</a>.';
+$("foot").innerHTML = 'Sprites animados do <a href="https://play.pokemonshowdown.com" target="_blank" rel="noopener">Pokémon Showdown</a>. Dados: <a href="https://pokeapi.co" target="_blank" rel="noopener">PokéAPI</a> e estatísticas do <a href="https://www.smogon.com/stats/" target="_blank" rel="noopener">Smogon</a>.';
 </script>
 </body>
 </html>
