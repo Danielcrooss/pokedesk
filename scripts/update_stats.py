@@ -99,88 +99,46 @@ def ivs_txt(v):
     return " / ".join(f"{n} {STAT.get(k, k)}" for k, n in v.items())
 
 
-def is_set(x):
-    if isinstance(x, list):
-        x = x[0] if x else None
-    return isinstance(x, dict) and "moves" in x
-
-
-def first_value(d):
-    return next(iter(d.values()), None) if isinstance(d, dict) else None
-
-
-def sets_by_tier(gen, index):
-    """Devolve {tier: {especie: {nome_set: set}}} para uma geracao (ex.: 'gen9')."""
-    try:
-        data = json.loads(get(f"{SETS_URL}{gen}.json"))
-        # arquivo da geracao: tier -> especie -> nome_set -> set
-        if is_set(first_value(first_value(first_value(data)))):
-            return data
-        print(f"estrategias {gen}: formato inesperado em {gen}.json, usando arquivos por formato", file=sys.stderr)
-    except Exception as e:
-        print(f"estrategias {gen}: erro em {gen}.json ({e}), usando arquivos por formato", file=sys.stderr)
-    out = {}
-    for key in index:
-        if key.startswith(gen) and key != gen and not key.startswith("gen9champions"):
-            try:
-                out[key[len(gen):]] = json.loads(get(f"{SETS_URL}{key}.json"))
-            except Exception as e:
-                print(f"estrategias {key}: erro {e}", file=sys.stderr)
-    return out
-
-
-def collect(tiers):
+def collect(data):
+    """Converte o arquivo do Smogon em {especie: [{tier, sets}]}.
+    O arquivo da geracao e organizado como especie -> formato -> nome do set -> set,
+    mas aceito tambem formato -> especie -> sets (detecta pela inicial maiuscula)."""
+    species_first = any(k[:1].isupper() for k in data)
+    if species_first:
+        pairs = ((sp, tier, sets) for sp, tiers in data.items() if isinstance(tiers, dict) for tier, sets in tiers.items())
+    else:
+        pairs = ((sp, tier, sets) for tier, spmap in data.items() if isinstance(spmap, dict) for sp, sets in spmap.items())
     res = {}
-    for tier, species_map in tiers.items():
-        if not isinstance(species_map, dict):
+    for species, tier, sets in pairs:
+        if not isinstance(sets, dict):
             continue
-        for species, sets in species_map.items():
-            if not isinstance(sets, dict):
-                continue
-            lst = []
-            for name, s in sets.items():
-                for item in (s if isinstance(s, list) else [s]):
-                    if isinstance(item, dict):
-                        lst.append(conv(name, item))
-            if lst:
-                res.setdefault(species, []).append({"tier": tier, "sets": lst})
+        lst = []
+        for name, s in sets.items():
+            for item in (s if isinstance(s, list) else [s]):
+                if isinstance(item, dict):
+                    lst.append(conv(name, item))
+        if lst:
+            res.setdefault(species, []).append({"tier": tier, "sets": lst})
     return res
 
 
 def strategies():
-    """Sets do Smogon Strategy Dex por geracao (sem os textos de analise, que tem autoria propria)."""
+    """Sets do Smogon Strategy Dex por geracao e do Champions (sem os textos de analise, que tem autoria propria)."""
     os.makedirs("data/strategies", exist_ok=True)
-    try:
-        index = json.loads(get(SETS_URL + "index.json"))
-    except Exception as e:
-        print(f"estrategias: sem index.json ({e})", file=sys.stderr)
-        index = {}
-    available, champions = [], {}
-    for n in range(1, 10):
-        gen = f"gen{n}"
-        tiers = sets_by_tier(gen, index)
-        if n == 9:
-            for t in list(tiers):
-                if t.startswith("champions"):
-                    champions[t[len("champions"):]] = tiers.pop(t)
-        res = collect(tiers)
+    available = []
+    sources = [(str(n), f"gen{n}") for n in range(1, 10)] + [("champions", "champions")]
+    for label, fname in sources:
+        try:
+            res = collect(json.loads(get(f"{SETS_URL}{fname}.json")))
+        except Exception as e:
+            print(f"estrategias {fname}: erro {e}", file=sys.stderr)
+            continue
+        tiers = sorted({g["tier"] for lst in res.values() for g in lst})
+        print(f"estrategias {fname}: {len(res)} pokemon, {len(tiers)} formatos")
         if res:
-            with open(f"data/strategies/{n}.json", "w", encoding="utf-8") as fh:
-                json.dump({"gen": n, "data": res}, fh, ensure_ascii=False, separators=(",", ":"))
-            available.append(str(n))
-        print(f"estrategias {gen}: {len(res)} pokemon, formatos: {sorted(tiers)}")
-    for key in index:
-        if key.startswith("gen9champions") and key[len("gen9champions"):] not in champions:
-            try:
-                champions[key[len("gen9champions"):]] = json.loads(get(f"{SETS_URL}{key}.json"))
-            except Exception as e:
-                print(f"estrategias {key}: erro {e}", file=sys.stderr)
-    res = collect(champions)
-    if res:
-        with open("data/strategies/champions.json", "w", encoding="utf-8") as fh:
-            json.dump({"gen": "champions", "data": res}, fh, ensure_ascii=False, separators=(",", ":"))
-        available.append("champions")
-    print(f"estrategias champions: {len(res)} pokemon, formatos: {sorted(champions)}")
+            with open(f"data/strategies/{label}.json", "w", encoding="utf-8") as fh:
+                json.dump({"gen": label, "data": res}, fh, ensure_ascii=False, separators=(",", ":"))
+            available.append(label)
     with open("data/strategies/index.json", "w", encoding="utf-8") as fh:
         json.dump({"gens": available}, fh)
 
