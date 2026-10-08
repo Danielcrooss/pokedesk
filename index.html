@@ -201,6 +201,7 @@ async function competitive(kind) {
   const mateList = L("Teammates", 10);
   const sprites = await Promise.all(mateList.map(x => sprite(x.k)));
   const mates = mateList.map((x, i) => `<button class="mate" data-n="${esc(x.k)}">${sprites[i] ? `<img src="${sprites[i]}" alt="">` : '<i class="ph"></i>'}<span class="mn">${esc(x.k)}</span><small>${pct(x.share)}</small></button>`).join("") || none;
+  const strat = await stratCard(kind === "vgc" ? "champions" : "9", kind === "singles" ? (t => SINGLES_TIERS.includes(t)) : (t => /^vgc/.test(t)));
   return `<div class="layout"><div>
   <p class="mute">Fonte: estatísticas do Smogon, formato ${esc(format)}.</p>
   <div class="grid">
@@ -208,7 +209,7 @@ async function competitive(kind) {
    <div class="card"><h3>Itens</h3>${iRows}</div>
    <div class="card"><h3>Habilidades</h3>${aRows}</div>
    <div class="card"><h3>${kind === "vgc" ? "Natureza e pontos de status" : "Natureza e EVs"}</h3>${kind === "vgc" ? '<p class="mute" style="margin:0 0 6px">No Champions não há EVs: cada status recebe até 32 pontos, somando no máximo 66.</p>' : ""}${sRows}</div>
-  </div></div>
+  </div>${strat}</div>
   <aside class="card"><h3>Companheiros de time</h3>${mates}</aside></div>`;
 }
 
@@ -450,41 +451,55 @@ function shell() {
 
 const SGENS = [["1", "RB"], ["2", "GS"], ["3", "RS"], ["4", "DP"], ["5", "BW"], ["6", "XY"], ["7", "SM"], ["8", "SS"], ["9", "SV"], ["champions", "Champions"]];
 const DEXCODE = { "1": "rb", "2": "gs", "3": "rs", "4": "dp", "5": "bw", "6": "xy", "7": "sm", "8": "ss", "9": "sv", champions: "champions" };
-const TIER_ORDER = ["ubers", "ou", "uu", "ru", "nu", "pu", "zu", "lc", "vgc", "doublesou", "doublesuu", "battlestadiumsingles", "monotype", "draft", "nationaldex", "nationaldexmonotype", "nationaldexdoubles"];
-const TIER_NAME = { ou: "OU", uu: "UU", ru: "RU", nu: "NU", pu: "PU", zu: "ZU", lc: "LC", ubers: "Ubers", vgc: "VGC", doublesou: "Doubles OU", doublesuu: "Doubles UU", monotype: "Monotype", draft: "Draft", nationaldex: "National Dex", nationaldexmonotype: "National Dex Monotype", nationaldexdoubles: "National Dex Doubles", battlestadiumsingles: "Battle Stadium Singles", cap: "CAP" };
+const TIER_ORDER = ["ubers", "ou", "uu", "ru", "nu", "pu", "zu", "lc", "vgc", "doublesou", "doublesuu", "battlestadiumsingles", "monotype", "nationaldex", "nationaldexmonotype", "nationaldexdoubles"];
+const TIER_NAME = { ou: "OU", uu: "UU", ru: "RU", nu: "NU", pu: "PU", zu: "ZU", lc: "LC", nfe: "NFE", ubers: "Ubers", ubersuu: "Ubers UU", vgc: "VGC", doublesou: "Doubles OU", doublesuu: "Doubles UU", monotype: "Monotype", draft: "Draft", nationaldex: "National Dex", nationaldexubers: "National Dex Ubers", nationaldexuu: "National Dex UU", nationaldexru: "National Dex RU", nationaldexmonotype: "National Dex Monotype", nationaldexdoubles: "National Dex Doubles", battlestadiumsingles: "Battle Stadium Singles", battlestadiumdoubles: "Battle Stadium Doubles", anythinggoes: "Anything Goes", almostanyability: "Almost Any Ability", balancedhackmons: "Balanced Hackmons", godlygift: "Godly Gift", mixandmega: "Mix and Mega", partnersincrime: "Partners in Crime", stabmons: "STABmons", inheritance: "Inheritance", cap: "CAP", "1v1": "1v1" };
+const SINGLES_TIERS = ["ubers", "ou", "uu", "ru", "nu", "pu", "zu", "lc", "nfe", "ubersuu", "monotype", "battlestadiumsingles", "nationaldex", "nationaldexubers", "nationaldexuu", "nationaldexru", "nationaldexmonotype"];
 const tierName = t => { const m = t.match(/^vgc(\d{4})(.*)$/); return m ? "VGC " + m[1] + (m[2] ? " " + m[2].toUpperCase() : "") : TIER_NAME[t] || t.toUpperCase(); };
+const tierRank = t => { const m = t.match(/^vgc(\d{4})/); if (m) return 8 + (3000 - +m[1]) / 10000; const i = TIER_ORDER.indexOf(t); return i < 0 ? 99 : i; };
 let sgen = "9", stier = null;
+const splitSlash = s => (s || "").split(" / ").filter(Boolean);
 
-async function stratTab() {
-  const nav = `<div class="gnav"><span class="mute">Geração:</span>${SGENS.map(([k, l]) => `<button class="chip${k === sgen ? " on" : ""}" data-sg="${k}">${l}</button>`).join("")}</div>`;
-  const name = pretty(mon.name);
-  const link = `<p class="mute" style="margin:6px 0 0">Análise completa no <a href="https://www.smogon.com/dex/${DEXCODE[sgen]}/pokemon/${slug(name)}/" target="_blank" rel="noopener">Smogon Strategy Dex</a>.</p>`;
-  let raw = null;
-  try { raw = await j(`data/strategies/${sgen}.json`); } catch (e) {}
-  if (!raw) return nav + `<div class="card"><p class="mute" style="margin:0">Ainda não há dados desta geração. Rode o workflow "Atualizar estatisticas" no GitHub e recarregue a página.</p></div>`;
+function setsFor(raw, name) {
   const keys = Object.keys(raw.data).filter(k => norm(k) === norm(name) || (k.startsWith(name + "-") && /^(Mega|Gmax|Primal)/.test(k.slice(name.length + 1)))).sort((a, b) => a.length - b.length);
   const byTier = {};
   keys.forEach(k => raw.data[k].forEach(g => (byTier[g.tier] = byTier[g.tier] || []).push({ form: k, sets: g.sets })));
-  const tiers = Object.keys(byTier).sort((a, b) => (TIER_ORDER.indexOf(a) + 1 || 99) - (TIER_ORDER.indexOf(b) + 1 || 99) || a.localeCompare(b));
-  if (!tiers.length) return nav + `<div class="card"><p class="mute" style="margin:0">Sem sets do Smogon para este Pokémon nesta geração.</p>${link}</div>`;
-  if (!tiers.includes(stier)) stier = tiers[0];
-  const tnav = `<div class="gnav"><span class="mute">Formato:</span>${tiers.map(t => `<button class="chip${t === stier ? " on" : ""}" data-st="${t}">${esc(tierName(t))}</button>`).join("")}</div>`;
+  return byTier;
+}
 
-  const split = s => (s || "").split(" / ").filter(Boolean);
+async function setCards(blocks) {
   const [mi, ii] = await Promise.all([index("move"), index("item")]);
   const mv = new Set(), it = new Set();
-  byTier[stier].forEach(b => b.sets.forEach(s => { s.moves.forEach(m => split(m).forEach(x => mv.add(x))); split(s.item).forEach(x => it.add(x)); }));
+  blocks.forEach(b => b.sets.forEach(s => { s.moves.forEach(m => splitSlash(m).forEach(x => mv.add(x))); splitSlash(s.item).forEach(x => it.add(x)); }));
   const md = {}, itd = {};
   await Promise.all([...mv].map(async n => { const sl = mi[norm(n)]; if (sl) try { md[n] = await j(`${POKEAPI}/move/${sl}`); } catch (e) {} }));
   await Promise.all([...it].map(async n => { const sl = ii[norm(n)]; if (sl) try { itd[n] = await j(`${POKEAPI}/item/${sl}`); } catch (e) {} }));
   const mchip = n => { const o = md[n]; return `<span class="mvchip">${o ? badge(o.type.name) + cls(o.damage_class.name) : ""}${esc(n)}</span>`; };
   const ichip = n => { const o = itd[n], img = o ? (o.sprites.default || ITEM_IMG(ii[norm(n)])) : ""; return `<span class="mvchip">${img ? `<img src="${img}" alt="" style="width:22px;height:22px;image-rendering:pixelated" onerror="this.style.visibility='hidden'">` : ""}${esc(n)}</span>`; };
   const row = (label, html) => html ? `<div class="kv"><span class="mute">${label}</span><div class="mvrow" style="margin:0">${html}</div></div>` : "";
+  return blocks.map(b => (blocks.length > 1 ? `<h4>${esc(b.form)}</h4>` : "") + b.sets.map(s => `<div class="sc"><b>${esc(s.name)}</b>
+    <div class="sg"><div>${s.moves.map((m, i) => row("Golpe " + (i + 1), splitSlash(m).map(mchip).join('<span class="mute">/</span>'))).join("")}</div>
+    <div>${row("Item", splitSlash(s.item).map(ichip).join('<span class="mute">/</span>'))}${row("Habilidade", esc(s.ability))}${row("Natureza", esc(s.nature))}${row("EVs", esc(s.evs))}${row("IVs", esc(s.ivs || ""))}${row("Tera", splitSlash(s.tera).map(t => badge(t.toLowerCase())).join(""))}</div></div></div>`).join("")).join("");
+}
 
-  const body = byTier[stier].map(b => (byTier[stier].length > 1 ? `<h4>${esc(b.form)}</h4>` : "") + b.sets.map(s => `<div class="sc"><b>${esc(s.name)}</b>
-    <div class="sg"><div>${s.moves.map((m, i) => row("Golpe " + (i + 1), split(m).map(mchip).join('<span class="mute">/</span>'))).join("")}</div>
-    <div>${row("Item", split(s.item).map(ichip).join('<span class="mute">/</span>'))}${row("Habilidade", esc(s.ability))}${row("Natureza", esc(s.nature))}${row("EVs", esc(s.evs))}${row("IVs", esc(s.ivs || ""))}${row("Tera", split(s.tera).map(t => badge(t.toLowerCase())).join(""))}</div></div></div>`).join("")).join("");
-  return `${nav}${tnav}<div class="card"><h3>Estratégias (Smogon) · ${esc(tierName(stier))}</h3>${body}${link}</div>`;
+// Cartão de estratégias do Smogon. genKey: "1".."9" ou "champions"; keep: quais formatos mostrar.
+async function stratCard(genKey, keep) {
+  const name = pretty(mon.name), gl = (SGENS.find(x => x[0] === genKey) || [0, genKey])[1];
+  const link = `<p class="mute" style="margin:6px 0 0">Análise completa no <a href="https://www.smogon.com/dex/${DEXCODE[genKey]}/pokemon/${slug(name)}/" target="_blank" rel="noopener">Smogon Strategy Dex</a>.</p>`;
+  let raw = null;
+  try { raw = await j(`data/strategies/${genKey}.json`); } catch (e) {}
+  if (!raw) return `<div class="card"><h3>Estratégias (Smogon) · ${esc(gl)}</h3><p class="mute" style="margin:0">Ainda não há dados desta geração. Rode o workflow "Atualizar estatisticas" no GitHub e recarregue a página.</p></div>`;
+  const byTier = setsFor(raw, name);
+  const tiers = Object.keys(byTier).filter(keep).sort((a, b) => tierRank(a) - tierRank(b) || a.localeCompare(b));
+  if (!tiers.length) return `<div class="card"><h3>Estratégias (Smogon) · ${esc(gl)}</h3><p class="mute" style="margin:0">Sem sets do Smogon para este Pokémon neste formato.</p>${link}</div>`;
+  if (!tiers.includes(stier)) stier = tiers[0];
+  const tnav = tiers.length > 1 ? `<div class="gnav"><span class="mute">Formato:</span>${tiers.map(t => `<button class="chip${t === stier ? " on" : ""}" data-st="${t}">${esc(tierName(t))}</button>`).join("")}</div>` : "";
+  return `<div class="card"><h3>Estratégias (Smogon) · ${esc(gl)} · ${esc(tierName(stier))}</h3>${tnav}${await setCards(byTier[stier])}${link}</div>`;
+}
+
+// Aba para consultar outras gerações (RB, GS, ... SV, Champions).
+async function stratTab() {
+  const nav = `<div class="gnav"><span class="mute">Geração:</span>${SGENS.map(([k, l]) => `<button class="chip${k === sgen ? " on" : ""}" data-sg="${k}">${l}</button>`).join("")}</div>`;
+  return nav + await stratCard(sgen, () => true);
 }
 
 async function renderTab() {
