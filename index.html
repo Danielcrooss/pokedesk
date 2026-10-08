@@ -80,6 +80,16 @@ select{font:inherit;font-size:.85rem;padding:5px 8px;border-radius:8px;border:1p
 .tg{display:inline-block;font-size:.68rem;padding:0 7px;border-radius:99px;margin-left:6px;background:var(--card2);border:1px solid var(--line);color:var(--mute)}
 .tg.dlc{background:var(--acc);border-color:var(--acc);color:var(--accink);font-weight:600}
 @media(max-width:560px){.mid{grid-template-columns:1fr}.bubble::before,.bubble::after{display:none}.loc{flex-direction:column;gap:0}}
+.chip.on{background:var(--acc);color:var(--accink);border-color:var(--acc);font-weight:600}
+.gnav{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 10px}
+.gnav .chip{margin:0}
+.sc{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:0 0 10px}
+.sc>b{font-size:.95rem}
+.sg{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px}
+.kv{display:flex;align-items:center;gap:8px;margin:4px 0;font-size:.85rem}
+.kv>.mute{width:66px;flex:none;font-size:.75rem}
+.kv .mvchip{margin:0}
+@media(max-width:560px){.sg{grid-template-columns:1fr}}
 .chip{border:1px solid var(--line);background:var(--card2);color:var(--ink);border-radius:99px;padding:5px 12px;font:inherit;font-size:.85rem;cursor:pointer;margin:0 6px 6px 0}
 .chip small{color:var(--mute);margin-left:4px}
 .mute{color:var(--mute);font-size:.85rem}
@@ -105,7 +115,7 @@ const GAME = "scarlet-violet";
 
 const NS = ["PS","Atq","Def","SpA","SpD","Vel"];
 const TC = {normal:"#9fa19f",fire:"#e8622a",water:"#4592e6",electric:"#e8b800",grass:"#3fa129",ice:"#3dcef3",fighting:"#d3425f",poison:"#9f5bd0",ground:"#a97a4a",flying:"#7fa4e8",psychic:"#ee6b7a",bug:"#8fa31b",rock:"#b8a86e",ghost:"#6c5aa8",dragon:"#4f60e2",dark:"#5b5466",steel:"#5a8ea5",fairy:"#ee90e6"};
-const MODES = [["vgc","VGC Champions"],["vgcsv","VGC Scarlet/Violet"],["singles","Singles"],["casual","Casual"]];
+const MODES = [["vgc","VGC Champions"],["vgcsv","VGC Scarlet/Violet"],["singles","Singles"],["casual","Casual"],["strat","Estratégias"]];
 const $ = id => document.getElementById(id);
 const cache = new Map();
 const j = async u => { if (cache.has(u)) return cache.get(u); const r = await fetch(u); if (!r.ok) throw new Error(r.status); const d = await r.json(); cache.set(u, d); return d; };
@@ -126,19 +136,6 @@ const idx = {};
 const index = kind => idx[kind] || (idx[kind] = j(`${POKEAPI}/${kind}?limit=3000`).then(d => Object.fromEntries(d.results.map(r => [norm(r.name), r.name]))).catch(() => { delete idx[kind]; return {}; }));
 
 const sprite = async name => { const sl = slug(name); for (const id of [sl, sl.split("-")[0]]) { try { return (await j(`${POKEAPI}/pokemon/${id}`)).sprites.front_default || ""; } catch (e) {} } return ""; };
-const fmtName = f => { const m = f.match(/^gen9vgc(\d{4})reg([a-z]+)$/); return m ? `VGC ${m[1]} Reg ${m[2].toUpperCase()}` : f === "gen9doublesou" ? "Doubles OU" : f.replace(/^gen9/, "").toUpperCase(); };
-async function strategies(kind, name) {
-  let raw; try { raw = await j("data/strategies.json"); } catch (e) { return ""; }
-  const grp = raw[kind === "singles" ? "singles" : "vgcsv"] || {};
-  const key = Object.keys(grp).find(k => norm(k) === norm(name));
-  const note = kind === "vgc" ? '<p class="mute">O Smogon não publica estratégias para o Champions. Estes são os sets de Scarlet/Violet, como referência: golpes e itens podem não existir no Champions, e os EVs deles (até 252) usam outra escala que os pontos de status.</p>' : "";
-  const link = `<p class="mute" style="margin-bottom:0">Análise completa no <a href="https://www.smogon.com/dex/sv/pokemon/${slug(name)}/" target="_blank" rel="noopener">Smogon Strategy Dex</a>.</p>`;
-  if (!key) return `<div class="card"><h3>Estratégias (Smogon)</h3>${note}<p class="mute">Sem sets do Smogon para este Pokémon neste formato.</p>${link}</div>`;
-  const body = grp[key].map(g => `<h4>${esc(fmtName(g.format))}</h4>` + g.sets.map(s => `<div class="set"><b>${esc(s.name)}</b>
-    <span>${[s.item && "Item: " + s.item, s.ability && "Habilidade: " + s.ability, s.nature && "Natureza: " + s.nature, s.tera && "Tera: " + s.tera].filter(Boolean).map(esc).join(" · ")}</span>
-    ${s.evs ? `<span>EVs: ${esc(s.evs)}</span>` : ""}<span>Golpes: ${s.moves.map(esc).join(", ")}</span></div>`).join("")).join("");
-  return `<div class="card"><h3>Estratégias (Smogon)</h3>${note}${body}${link}</div>`;
-}
 const ROLE_PT = { "Fast Attacker": "Atacante rápido", "Setup Sweeper": "Atacante com setup", "Wallbreaker": "Quebra-defesas", "Bulky Attacker": "Atacante resistente", "Bulky Setup": "Setup resistente", "Fast Support": "Suporte rápido", "Bulky Support": "Suporte resistente", "Staller": "Desgaste", "Tera Blast user": "Usuário de Tera Blast", "Offensive Protect": "Protect ofensivo", "Choice Item user": "Usuário de item Choice", "AV Pivot": "Pivô com Assault Vest", "Spinner": "Removedor de hazards", "Doubles Fast Attacker": "Atacante rápido (Doubles)", "Doubles Setup Sweeper": "Atacante com setup (Doubles)", "Doubles Wallbreaker": "Quebra-defesas (Doubles)", "Doubles Bulky Attacker": "Atacante resistente (Doubles)", "Doubles Bulky Setup": "Setup resistente (Doubles)", "Doubles Support": "Suporte (Doubles)", "Baton Pass user": "Usuário de Baton Pass", "Berry Sweeper": "Atacante com berry" };
 const trCache = (() => { try { return JSON.parse(localStorage.getItem("trpt1") || "{}"); } catch (e) { return {}; } })();
 const decode = s => { const e = document.createElement("textarea"); e.innerHTML = s; return e.value; };
@@ -204,7 +201,6 @@ async function competitive(kind) {
   const mateList = L("Teammates", 10);
   const sprites = await Promise.all(mateList.map(x => sprite(x.k)));
   const mates = mateList.map((x, i) => `<button class="mate" data-n="${esc(x.k)}">${sprites[i] ? `<img src="${sprites[i]}" alt="">` : '<i class="ph"></i>'}<span class="mn">${esc(x.k)}</span><small>${pct(x.share)}</small></button>`).join("") || none;
-  const strat = await strategies(kind, pretty(mon.name));
   return `<div class="layout"><div>
   <p class="mute">Fonte: estatísticas do Smogon, formato ${esc(format)}.</p>
   <div class="grid">
@@ -212,7 +208,7 @@ async function competitive(kind) {
    <div class="card"><h3>Itens</h3>${iRows}</div>
    <div class="card"><h3>Habilidades</h3>${aRows}</div>
    <div class="card"><h3>${kind === "vgc" ? "Natureza e pontos de status" : "Natureza e EVs"}</h3>${kind === "vgc" ? '<p class="mute" style="margin:0 0 6px">No Champions não há EVs: cada status recebe até 32 pontos, somando no máximo 66.</p>' : ""}${sRows}</div>
-  </div>${strat}</div>
+  </div></div>
   <aside class="card"><h3>Companheiros de time</h3>${mates}</aside></div>`;
 }
 
@@ -327,10 +323,14 @@ async function casual() {
 }
 
 /* ---------- Tela ---------- */
-const GNAME = { "lets-go-pikachu": "Let's Go Pikachu", "lets-go-eevee": "Let's Go Eevee", "the-isle-of-armor": "Isle of Armor", "the-crown-tundra": "Crown Tundra", "the-teal-mask": "Teal Mask", "the-indigo-disk": "Indigo Disk", "legends-arceus": "Legends: Arceus", "black-2": "Black 2", "white-2": "White 2" };
+const GNAME = { firered: "FireRed", leafgreen: "LeafGreen", heartgold: "HeartGold", soulsilver: "SoulSilver", xd: "XD", "lets-go-pikachu": "Let's Go Pikachu", "lets-go-eevee": "Let's Go Eevee", "legends-arceus": "Legends: Arceus", "black-2": "Black 2", "white-2": "White 2",
+  "the-isle-of-armor": "Isle of Armor", "the-isle-of-armor-sword": "Isle of Armor", "the-isle-of-armor-shield": "Isle of Armor",
+  "the-crown-tundra": "Crown Tundra", "the-crown-tundra-sword": "Crown Tundra", "the-crown-tundra-shield": "Crown Tundra",
+  "the-teal-mask": "Teal Mask", "the-teal-mask-scarlet": "Teal Mask", "the-teal-mask-violet": "Teal Mask",
+  "the-indigo-disk": "Indigo Disk", "the-indigo-disk-scarlet": "Indigo Disk", "the-indigo-disk-violet": "Indigo Disk" };
 const gname = v => GNAME[v] || pretty(v);
 const SPR = { red: ["generation-i", "red-blue"], blue: ["generation-i", "red-blue"], yellow: ["generation-i", "yellow"], gold: ["generation-ii", "gold"], silver: ["generation-ii", "silver"], crystal: ["generation-ii", "crystal"], ruby: ["generation-iii", "ruby-sapphire"], sapphire: ["generation-iii", "ruby-sapphire"], emerald: ["generation-iii", "emerald"], firered: ["generation-iii", "firered-leafgreen"], leafgreen: ["generation-iii", "firered-leafgreen"], diamond: ["generation-iv", "diamond-pearl"], pearl: ["generation-iv", "diamond-pearl"], platinum: ["generation-iv", "platinum"], heartgold: ["generation-iv", "heartgold-soulsilver"], soulsilver: ["generation-iv", "heartgold-soulsilver"], black: ["generation-v", "black-white"], white: ["generation-v", "black-white"], "black-2": ["generation-v", "black-white"], "white-2": ["generation-v", "black-white"], x: ["generation-vi", "x-y"], y: ["generation-vi", "x-y"], "omega-ruby": ["generation-vi", "omegaruby-alphasapphire"], "alpha-sapphire": ["generation-vi", "omegaruby-alphasapphire"], sun: ["generation-vii", "ultra-sun-ultra-moon"], moon: ["generation-vii", "ultra-sun-ultra-moon"], "ultra-sun": ["generation-vii", "ultra-sun-ultra-moon"], "ultra-moon": ["generation-vii", "ultra-sun-ultra-moon"] };
-// Jogos agrupados: pares da mesma geração ficam juntos e as DLCs entram no jogo original.
+// Todos os jogos, em pares da mesma geração. As DLCs entram no jogo original.
 const GROUPS = [
   { id: "rb", gen: "I", name: "Red / Blue", vs: ["red", "blue"] },
   { id: "y", gen: "I", name: "Yellow", vs: ["yellow"] },
@@ -350,21 +350,22 @@ const GROUPS = [
   { id: "sm", gen: "VII", name: "Sun / Moon", vs: ["sun", "moon"] },
   { id: "usum", gen: "VII", name: "Ultra Sun / Ultra Moon", vs: ["ultra-sun", "ultra-moon"] },
   { id: "lg", gen: "VII", name: "Let's Go Pikachu / Eevee", vs: ["lets-go-pikachu", "lets-go-eevee"] },
-  { id: "swsh", gen: "VIII", name: "Sword / Shield", vs: ["sword", "shield"], dlc: ["the-isle-of-armor", "the-crown-tundra"] },
+  { id: "swsh", gen: "VIII", name: "Sword / Shield", vs: ["sword", "shield"], dlcRe: /^the-(isle-of-armor|crown-tundra)/, dlc: ["the-isle-of-armor", "the-crown-tundra", "the-isle-of-armor-sword", "the-isle-of-armor-shield", "the-crown-tundra-sword", "the-crown-tundra-shield"] },
   { id: "bdsp", gen: "VIII", name: "Brilliant Diamond / Shining Pearl", vs: ["brilliant-diamond", "shining-pearl"] },
   { id: "pla", gen: "VIII", name: "Legends: Arceus", vs: ["legends-arceus"] },
-  { id: "sv", gen: "IX", name: "Scarlet / Violet", vs: ["scarlet", "violet"], dlc: ["the-teal-mask", "the-indigo-disk"] }
+  { id: "sv", gen: "IX", name: "Scarlet / Violet", vs: ["scarlet", "violet"], dlcRe: /^the-(teal-mask|indigo-disk)/, dlc: ["the-teal-mask", "the-indigo-disk", "the-teal-mask-scarlet", "the-teal-mask-violet", "the-indigo-disk-scarlet", "the-indigo-disk-violet"] }
 ];
 let curGames = [];
 const G = () => curGames.find(g => g.id === game);
 const allVers = g => [...g.vs, ...(g.dlc || [])];
+const isDlc = (g, v) => (g.dlc || []).includes(v) || !!(g.dlcRe && g.dlcRe.test(v));
+const spId = u => +u.split("/").filter(Boolean).pop();
 
-function gamesOf() {
+function versionsWithData() {
   const set = new Set();
   (mon.sp ? mon.sp.flavor_text_entries : []).forEach(e => { if (e.language.name === "en") set.add(e.version.name); });
   mon.enc.forEach(l => l.version_details.forEach(v => set.add(v.version.name)));
-  const known = new Set(GROUPS.flatMap(allVers));
-  return GROUPS.filter(g => allVers(g).some(v => set.has(v))).concat([...set].filter(v => !known.has(v)).map(v => ({ id: v, gen: "Outros", name: gname(v), vs: [v] })));
+  return set;
 }
 function artFor(g) {
   const s = mon.sprites, e = g && SPR[g.vs[0]], v = e && s.versions && s.versions[e[0]] && s.versions[e[0]][e[1]];
@@ -373,24 +374,30 @@ function artFor(g) {
 }
 function descFor(g) {
   const fl = mon.sp ? mon.sp.flavor_text_entries.filter(e => e.language.name === "en") : [];
-  const e = (g && (fl.find(x => g.vs.includes(x.version.name)) || fl.find(x => (g.dlc || []).includes(x.version.name)))) || fl[fl.length - 1];
+  const e = (g && (fl.find(x => g.vs.includes(x.version.name)) || fl.find(x => isDlc(g, x.version.name)))) || fl[fl.length - 1];
   return e ? e.flavor_text.replace(/[\n\f\u00ad]/g, " ").replace(/\s+/g, " ").trim() : "";
 }
-function locsFor(g) {
+function locsFor(enc, g, prefix) {
   if (!g) return [];
   const out = [];
-  mon.enc.forEach(l => {
+  enc.forEach(l => {
     const base = [], dlc = [], det = [];
-    l.version_details.forEach(v => { const n = v.version.name; if (g.vs.includes(n)) base.push(n); else if ((g.dlc || []).includes(n)) dlc.push(n); else return; det.push(v); });
+    l.version_details.forEach(v => { const n = v.version.name; if (g.vs.includes(n)) base.push(n); else if (isDlc(g, n)) dlc.push(n); else return; det.push(v); });
     if (!det.length) return;
     let lo = 999, hi = 0, ch = 0; const ms = new Set();
     det.forEach(v => { ch = Math.max(ch, v.max_chance); v.encounter_details.forEach(d => { lo = Math.min(lo, d.min_level); hi = Math.max(hi, d.max_level); ms.add(pretty(d.method.name)); }); });
     let tag = "";
-    if (!base.length) tag = "DLC · " + dlc.map(gname).join(", ");
+    if (!base.length) tag = "DLC · " + [...new Set(dlc.map(gname))].join(", ");
     else if (g.vs.length > 1 && base.length < g.vs.length) tag = "só " + base.map(gname).join(", ");
-    out.push({ n: pretty(l.location_area.name.replace(/-area$/, "")), lv: [lo, hi], m: [...ms].join(", "), ch, tag, dlc: !base.length });
+    out.push({ n: pretty(l.location_area.name.replace(/-area$/, "")), lv: [lo, hi], m: [...ms].join(", "), ch, tag: [prefix, tag].filter(Boolean).join(" · "), dlc: !base.length });
   });
   return out.sort((a, b) => a.dlc - b.dlc);
+}
+async function ancestors() {
+  const ch = await j(mon.sp.evolution_chain.url), me = mon.species.name, path = [];
+  const find = (n, acc) => { const cur = { name: n.species.name, id: spId(n.species.url) }; if (cur.name === me) { path.push(...acc); return true; } return n.evolves_to.some(k => find(k, [...acc, cur])); };
+  find(ch.chain, []);
+  return path.reverse();
 }
 const availCache = {};
 async function availSpecies(g) {
@@ -399,27 +406,39 @@ async function availSpecies(g) {
   const vgs = new Set(), dexes = new Set(), ids = new Set();
   await Promise.all(allVers(g).map(async v => { try { vgs.add((await j(`${POKEAPI}/version/${v}`)).version_group.url); } catch (e) {} }));
   await Promise.all([...vgs].map(async u => { try { (await j(u)).pokedexes.forEach(d => dexes.add(d.url)); } catch (e) {} }));
-  await Promise.all([...dexes].map(async u => { try { (await j(u)).pokemon_entries.forEach(e => ids.add(+e.pokemon_species.url.split("/").filter(Boolean).pop())); } catch (e) {} }));
+  await Promise.all([...dexes].map(async u => { try { (await j(u)).pokemon_entries.forEach(e => ids.add(spId(e.pokemon_species.url))); } catch (e) {} }));
   return ids.size ? (availCache[g.id] = ids) : null;
 }
-function renderGame() {
-  const g = G(), [src, pix] = artFor(g), img = $("art");
+async function renderGame() {
+  const my = (renderGame.n = (renderGame.n || 0) + 1), g = G(), [src, pix] = artFor(g), img = $("art");
   img.src = src; img.style.imageRendering = pix ? "pixelated" : "auto";
   const d = descFor(g), el = $("desc");
   el.dataset.tr = d; el.textContent = d;
   if (d) translateAll($("hdr"), renderTab.id);
-  const L = locsFor(g);
-  $("locs").innerHTML = L.length
-    ? L.map(x => `<div class="loc"><span><b>${esc(x.n)}</b>${x.tag ? `<span class="tg${x.dlc ? " dlc" : ""}">${esc(x.tag)}</span>` : ""}</span><span class="mute">${x.lv[1] ? "Lv " + (x.lv[0] === x.lv[1] ? x.lv[0] : x.lv[0] + "–" + x.lv[1]) + " · " : ""}${esc(x.m)} · ${x.ch}%</span></div>`).join("")
-    : '<p class="mute" style="margin:0">A PokéAPI não tem locais para este jogo (pode ser presente, troca, evento ou um jogo sem esses dados).</p>';
+  let L = locsFor(mon.enc, g, ""), note = "";
+  if (!L.length && g && mon.sp) {
+    try {
+      for (const a of await ancestors()) {
+        const enc = await j(`${POKEAPI}/pokemon/${a.id}/encounters`).catch(() => []);
+        L = L.concat(locsFor(enc, g, "evolução de " + pretty(a.name)));
+      }
+      if (L.length) note = "Este Pokémon não aparece selvagem neste jogo. Abaixo, onde achar a pré-evolução.";
+    } catch (e) {}
+  }
+  if (!L.length && g) {
+    const av = await availSpecies(g).catch(() => null);
+    note = av && mon.sp && !av.has(spId(mon.species.url)) ? "Este Pokémon não existe neste jogo." : "A PokéAPI não tem locais para este jogo (pode ser presente, troca, evento ou um jogo sem esses dados).";
+  }
+  if (my !== renderGame.n) return;
+  $("locs").innerHTML = (note ? `<p class="mute" style="margin:0 0 4px">${esc(note)}</p>` : "") + L.map(x => `<div class="loc"><span><b>${esc(x.n)}</b>${x.tag ? `<span class="tg${x.dlc ? " dlc" : ""}">${esc(x.tag)}</span>` : ""}</span><span class="mute">${x.lv[1] ? "Lv " + (x.lv[0] === x.lv[1] ? x.lv[0] : x.lv[0] + "–" + x.lv[1]) + " · " : ""}${esc(x.m)} · ${x.ch}%</span></div>`).join("");
 }
 
 function shell() {
-  const m = mon;
-  curGames = gamesOf();
-  if (!curGames.some(g => g.id === game)) game = curGames.length ? curGames[curGames.length - 1].id : "";
+  const m = mon, have = versionsWithData(), known = new Set(GROUPS.flatMap(allVers));
+  curGames = GROUPS.concat([...have].filter(v => !known.has(v) && !GROUPS.some(g => g.dlcRe && g.dlcRe.test(v))).map(v => ({ id: v, gen: "Outros", name: gname(v), vs: [v] })));
+  if (!curGames.some(g => g.id === game)) { const withData = curGames.filter(g => allVers(g).some(v => have.has(v))); game = (withData[withData.length - 1] || curGames[curGames.length - 1]).id; }
   const gens = [...new Set(curGames.map(g => g.gen))];
-  const sel = curGames.length ? `<select id="game" aria-label="Jogo">${gens.map(gn => `<optgroup label="${gn === "Outros" ? "Outros" : "Geração " + gn}">${curGames.filter(g => g.gen === gn).map(g => `<option value="${g.id}"${g.id === game ? " selected" : ""}>${esc(g.name)}</option>`).join("")}</optgroup>`).join("")}</select>` : "";
+  const sel = `<select id="game" aria-label="Jogo">${gens.map(gn => `<optgroup label="${gn === "Outros" ? "Outros" : "Geração " + gn}">${curGames.filter(g => g.gen === gn).map(g => `<option value="${g.id}"${g.id === game ? " selected" : ""}>${esc(g.name)}</option>`).join("")}</optgroup>`).join("")}</select>`;
   const genus = m.sp ? ((m.sp.genera || []).find(x => x.language.name === "en") || {}).genus : "";
   return `<div class="card hd" id="hdr">
   <div class="top"><img id="art" alt="${esc(pretty(m.name))}"><div class="hr"><h2>${esc(pretty(m.name))} <small class="mute">#${m.id}${genus ? " · " + esc(genus) : ""}</small></h2><div>${m.types.map(t => badge(t.type.name)).join("")}</div></div></div>
@@ -429,10 +448,49 @@ function shell() {
   <div class="tabs" role="tablist">${MODES.map(x => `<button class="tab" role="tab" data-m="${x[0]}" aria-selected="${x[0] === mode}">${x[1]}</button>`).join("")}</div><div id="tab"></div>`;
 }
 
+const SGENS = [["1", "RB"], ["2", "GS"], ["3", "RS"], ["4", "DP"], ["5", "BW"], ["6", "XY"], ["7", "SM"], ["8", "SS"], ["9", "SV"], ["champions", "Champions"]];
+const DEXCODE = { "1": "rb", "2": "gs", "3": "rs", "4": "dp", "5": "bw", "6": "xy", "7": "sm", "8": "ss", "9": "sv", champions: "champions" };
+const TIER_ORDER = ["ubers", "ou", "uu", "ru", "nu", "pu", "zu", "lc", "vgc", "doublesou", "doublesuu", "battlestadiumsingles", "monotype", "draft", "nationaldex", "nationaldexmonotype", "nationaldexdoubles"];
+const TIER_NAME = { ou: "OU", uu: "UU", ru: "RU", nu: "NU", pu: "PU", zu: "ZU", lc: "LC", ubers: "Ubers", vgc: "VGC", doublesou: "Doubles OU", doublesuu: "Doubles UU", monotype: "Monotype", draft: "Draft", nationaldex: "National Dex", nationaldexmonotype: "National Dex Monotype", nationaldexdoubles: "National Dex Doubles", battlestadiumsingles: "Battle Stadium Singles", cap: "CAP" };
+const tierName = t => { const m = t.match(/^vgc(\d{4})(.*)$/); return m ? "VGC " + m[1] + (m[2] ? " " + m[2].toUpperCase() : "") : TIER_NAME[t] || t.toUpperCase(); };
+let sgen = "9", stier = null;
+
+async function stratTab() {
+  const nav = `<div class="gnav"><span class="mute">Geração:</span>${SGENS.map(([k, l]) => `<button class="chip${k === sgen ? " on" : ""}" data-sg="${k}">${l}</button>`).join("")}</div>`;
+  const name = pretty(mon.name);
+  const link = `<p class="mute" style="margin:6px 0 0">Análise completa no <a href="https://www.smogon.com/dex/${DEXCODE[sgen]}/pokemon/${slug(name)}/" target="_blank" rel="noopener">Smogon Strategy Dex</a>.</p>`;
+  let raw = null;
+  try { raw = await j(`data/strategies/${sgen}.json`); } catch (e) {}
+  if (!raw) return nav + `<div class="card"><p class="mute" style="margin:0">Ainda não há dados desta geração. Rode o workflow "Atualizar estatisticas" no GitHub e recarregue a página.</p></div>`;
+  const keys = Object.keys(raw.data).filter(k => norm(k) === norm(name) || (k.startsWith(name + "-") && /^(Mega|Gmax|Primal)/.test(k.slice(name.length + 1)))).sort((a, b) => a.length - b.length);
+  const byTier = {};
+  keys.forEach(k => raw.data[k].forEach(g => (byTier[g.tier] = byTier[g.tier] || []).push({ form: k, sets: g.sets })));
+  const tiers = Object.keys(byTier).sort((a, b) => (TIER_ORDER.indexOf(a) + 1 || 99) - (TIER_ORDER.indexOf(b) + 1 || 99) || a.localeCompare(b));
+  if (!tiers.length) return nav + `<div class="card"><p class="mute" style="margin:0">Sem sets do Smogon para este Pokémon nesta geração.</p>${link}</div>`;
+  if (!tiers.includes(stier)) stier = tiers[0];
+  const tnav = `<div class="gnav"><span class="mute">Formato:</span>${tiers.map(t => `<button class="chip${t === stier ? " on" : ""}" data-st="${t}">${esc(tierName(t))}</button>`).join("")}</div>`;
+
+  const split = s => (s || "").split(" / ").filter(Boolean);
+  const [mi, ii] = await Promise.all([index("move"), index("item")]);
+  const mv = new Set(), it = new Set();
+  byTier[stier].forEach(b => b.sets.forEach(s => { s.moves.forEach(m => split(m).forEach(x => mv.add(x))); split(s.item).forEach(x => it.add(x)); }));
+  const md = {}, itd = {};
+  await Promise.all([...mv].map(async n => { const sl = mi[norm(n)]; if (sl) try { md[n] = await j(`${POKEAPI}/move/${sl}`); } catch (e) {} }));
+  await Promise.all([...it].map(async n => { const sl = ii[norm(n)]; if (sl) try { itd[n] = await j(`${POKEAPI}/item/${sl}`); } catch (e) {} }));
+  const mchip = n => { const o = md[n]; return `<span class="mvchip">${o ? badge(o.type.name) + cls(o.damage_class.name) : ""}${esc(n)}</span>`; };
+  const ichip = n => { const o = itd[n], img = o ? (o.sprites.default || ITEM_IMG(ii[norm(n)])) : ""; return `<span class="mvchip">${img ? `<img src="${img}" alt="" style="width:22px;height:22px;image-rendering:pixelated" onerror="this.style.visibility='hidden'">` : ""}${esc(n)}</span>`; };
+  const row = (label, html) => html ? `<div class="kv"><span class="mute">${label}</span><div class="mvrow" style="margin:0">${html}</div></div>` : "";
+
+  const body = byTier[stier].map(b => (byTier[stier].length > 1 ? `<h4>${esc(b.form)}</h4>` : "") + b.sets.map(s => `<div class="sc"><b>${esc(s.name)}</b>
+    <div class="sg"><div>${s.moves.map((m, i) => row("Golpe " + (i + 1), split(m).map(mchip).join('<span class="mute">/</span>'))).join("")}</div>
+    <div>${row("Item", split(s.item).map(ichip).join('<span class="mute">/</span>'))}${row("Habilidade", esc(s.ability))}${row("Natureza", esc(s.nature))}${row("EVs", esc(s.evs))}${row("IVs", esc(s.ivs || ""))}${row("Tera", split(s.tera).map(t => badge(t.toLowerCase())).join(""))}</div></div></div>`).join("")).join("");
+  return `${nav}${tnav}<div class="card"><h3>Estratégias (Smogon) · ${esc(tierName(stier))}</h3>${body}${link}</div>`;
+}
+
 async function renderTab() {
   const t = $("tab"), my = ++renderTab.id; t.innerHTML = '<p class="mute">Carregando…</p>';
   let html;
-  try { html = mode === "casual" ? await casual() : await competitive(mode); }
+  try { html = mode === "casual" ? await casual() : mode === "strat" ? await stratTab() : await competitive(mode); }
   catch (e) { html = `<div class="card">Não foi possível carregar os dados competitivos (${esc(e.message)}). Veja direto no <a href="https://www.pikalytics.com/pokedex" target="_blank" rel="noopener">Pikalytics</a>.</div>`; }
   if (my === renderTab.id) { t.innerHTML = html; translateAll(t, my); }
 }
@@ -454,6 +512,9 @@ document.addEventListener("change", e => { if (e.target.id === "game") { game = 
 document.addEventListener("click", e => {
   const n = e.target.closest("[data-n]"), t = e.target.closest("[data-m]");
   if (n) show(n.dataset.n);
+  const sg = e.target.closest("[data-sg]"), st = e.target.closest("[data-st]");
+  if (sg) { sgen = sg.dataset.sg; stier = null; renderTab(); }
+  if (st) { stier = st.dataset.st; renderTab(); }
   if (t && mon) { mode = t.dataset.m; document.querySelectorAll(".tab").forEach(b => b.setAttribute("aria-selected", b.dataset.m === mode)); renderTab(); }
 });
 $("q").addEventListener("keydown", e => { if (e.key === "Enter") show($("q").value); });
