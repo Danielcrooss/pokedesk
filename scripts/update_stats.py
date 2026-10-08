@@ -84,6 +84,7 @@ def conv(name, s):
         "nature": txt(s.get("nature")),
         "evs": evs_txt(s.get("evs")),
         "tera": txt(s.get("teratypes") or s.get("teraTypes")),
+        "ivs": ivs_txt(s.get("ivs")),
     }
 
 
@@ -92,35 +93,96 @@ def reg_key(f):
     return m.groups() if m else (f,)
 
 
-def strategies():
-    """Sets do Smogon Strategy Dex (sem os textos de analise, que tem autoria propria)."""
-    index = json.loads(get(SETS_URL + "index.json"))
-    avail = [k for k in index if k.startswith("gen9") and k != "gen9"]
-    vgc = sorted([f for f in avail if re.match(r"^gen9vgc\d{4}reg[a-z]+$", f)], key=reg_key, reverse=True)[:2]
-    groups = {
-        "singles": [f for f in SINGLES_FORMATS if f in avail],
-        "vgcsv": vgc + [f for f in ["gen9doublesou"] if f in avail],
-    }
+def ivs_txt(v):
+    if not v or not isinstance(v, dict):
+        return ""
+    return " / ".join(f"{n} {STAT.get(k, k)}" for k, n in v.items())
+
+
+def is_set(x):
+    if isinstance(x, list):
+        x = x[0] if x else None
+    return isinstance(x, dict) and "moves" in x
+
+
+def first_value(d):
+    return next(iter(d.values()), None) if isinstance(d, dict) else None
+
+
+def sets_by_tier(gen, index):
+    """Devolve {tier: {especie: {nome_set: set}}} para uma geracao (ex.: 'gen9')."""
+    try:
+        data = json.loads(get(f"{SETS_URL}{gen}.json"))
+        # arquivo da geracao: tier -> especie -> nome_set -> set
+        if is_set(first_value(first_value(first_value(data)))):
+            return data
+        print(f"estrategias {gen}: formato inesperado em {gen}.json, usando arquivos por formato", file=sys.stderr)
+    except Exception as e:
+        print(f"estrategias {gen}: erro em {gen}.json ({e}), usando arquivos por formato", file=sys.stderr)
     out = {}
-    for gname, fmts in groups.items():
-        res = {}
-        for f in fmts:
+    for key in index:
+        if key.startswith(gen) and key != gen and not key.startswith("gen9champions"):
             try:
-                data = json.loads(get(f"{SETS_URL}{f}.json"))
+                out[key[len(gen):]] = json.loads(get(f"{SETS_URL}{key}.json"))
             except Exception as e:
-                print(f"estrategias {f}: erro {e}", file=sys.stderr)
+                print(f"estrategias {key}: erro {e}", file=sys.stderr)
+    return out
+
+
+def collect(tiers):
+    res = {}
+    for tier, species_map in tiers.items():
+        if not isinstance(species_map, dict):
+            continue
+        for species, sets in species_map.items():
+            if not isinstance(sets, dict):
                 continue
-            for species, sets in data.items():
-                lst = []
-                for name, s in sets.items():
-                    for item in (s if isinstance(s, list) else [s]):
+            lst = []
+            for name, s in sets.items():
+                for item in (s if isinstance(s, list) else [s]):
+                    if isinstance(item, dict):
                         lst.append(conv(name, item))
-                if lst:
-                    res.setdefault(species, []).append({"format": f, "sets": lst})
-        out[gname] = res
-        print(f"estrategias {gname}: {len(res)} pokemon em {fmts}")
-    with open("data/strategies.json", "w", encoding="utf-8") as fh:
-        json.dump(out, fh, ensure_ascii=False, separators=(",", ":"))
+            if lst:
+                res.setdefault(species, []).append({"tier": tier, "sets": lst})
+    return res
+
+
+def strategies():
+    """Sets do Smogon Strategy Dex por geracao (sem os textos de analise, que tem autoria propria)."""
+    os.makedirs("data/strategies", exist_ok=True)
+    try:
+        index = json.loads(get(SETS_URL + "index.json"))
+    except Exception as e:
+        print(f"estrategias: sem index.json ({e})", file=sys.stderr)
+        index = {}
+    available, champions = [], {}
+    for n in range(1, 10):
+        gen = f"gen{n}"
+        tiers = sets_by_tier(gen, index)
+        if n == 9:
+            for t in list(tiers):
+                if t.startswith("champions"):
+                    champions[t[len("champions"):]] = tiers.pop(t)
+        res = collect(tiers)
+        if res:
+            with open(f"data/strategies/{n}.json", "w", encoding="utf-8") as fh:
+                json.dump({"gen": n, "data": res}, fh, ensure_ascii=False, separators=(",", ":"))
+            available.append(str(n))
+        print(f"estrategias {gen}: {len(res)} pokemon, formatos: {sorted(tiers)}")
+    for key in index:
+        if key.startswith("gen9champions") and key[len("gen9champions"):] not in champions:
+            try:
+                champions[key[len("gen9champions"):]] = json.loads(get(f"{SETS_URL}{key}.json"))
+            except Exception as e:
+                print(f"estrategias {key}: erro {e}", file=sys.stderr)
+    res = collect(champions)
+    if res:
+        with open("data/strategies/champions.json", "w", encoding="utf-8") as fh:
+            json.dump({"gen": "champions", "data": res}, fh, ensure_ascii=False, separators=(",", ":"))
+        available.append("champions")
+    print(f"estrategias champions: {len(res)} pokemon, formatos: {sorted(champions)}")
+    with open("data/strategies/index.json", "w", encoding="utf-8") as fh:
+        json.dump({"gens": available}, fh)
 
 
 RAND_STATS = "https://pkmn.github.io/randbats/data/stats/gen9randombattle.json"
