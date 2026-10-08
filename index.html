@@ -58,22 +58,28 @@ h4{margin:14px 0 8px;font-size:.85rem;font-weight:600;color:var(--acc)}
 .mvchip{display:inline-flex;align-items:center;gap:5px;background:var(--card2);border:1px solid var(--line);border-radius:8px;padding:2px 8px 2px 4px;margin:0 6px 6px 0;font-size:.82rem}
 .mvchip .tp{min-width:0;margin:0;padding:0 6px;font-size:.7rem}
 .mvchip .ci{width:18px;height:18px}
-.hd{display:grid;grid-template-columns:96px 1fr;gap:6px 14px;padding:12px 14px}
-.hl img{width:96px;height:96px;object-fit:contain}
+.hd{padding:12px 14px}
+.top{display:flex;align-items:center;gap:12px}
+.top img{width:84px;height:84px;object-fit:contain}
 .hr h2{margin:0 0 4px;font-size:1.3rem;font-weight:700}
 .hr h2 small{font-size:.8rem;font-weight:400}
-.desc{margin:6px 0 0;font-size:.85rem;color:var(--mute);line-height:1.4}
-.sts{grid-column:1/-1;display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
-.sts .s{font-size:.75rem;text-align:center}
-.sts .s b{display:block;font-size:.95rem}
-.sts .bar{height:5px;margin-top:2px}
-.where{grid-column:1/-1;border-top:1px solid var(--line);padding-top:8px}
+.mid{display:grid;grid-template-columns:230px 1fr;gap:16px;margin-top:10px;align-items:start}
+.sts .s{display:grid;grid-template-columns:34px 30px 1fr;gap:8px;align-items:center;font-size:.8rem;margin:3px 0}
+.sts .s b{font-size:.85rem;text-align:right}
+.sts .bar{height:6px}
+.bubble{position:relative;background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:12px 14px;font-size:.88rem;line-height:1.5;align-self:stretch;display:flex;align-items:center}
+.bubble::before{content:"";position:absolute;left:-9px;top:20px;border:8px solid transparent;border-left:0;border-right-color:var(--line)}
+.bubble::after{content:"";position:absolute;left:-7px;top:21px;border:7px solid transparent;border-left:0;border-right-color:var(--card2)}
+.bubble p{margin:0}
+.where{border-top:1px solid var(--line);margin-top:10px;padding-top:8px}
 .wh{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px;font-size:.9rem}
-select{font:inherit;font-size:.85rem;padding:5px 8px;border-radius:8px;border:1px solid var(--line);background:var(--card2);color:var(--ink)}
+select{font:inherit;font-size:.85rem;padding:5px 8px;border-radius:8px;border:1px solid var(--line);background:var(--card2);color:var(--ink);max-width:62%}
 .locs{max-height:130px;overflow:auto}
 .loc{display:flex;justify-content:space-between;gap:10px;font-size:.82rem;padding:2px 0;border-bottom:1px solid var(--line)}
 .loc b{font-weight:500}
-@media(max-width:560px){.sts{grid-template-columns:repeat(3,1fr)}.loc{flex-direction:column;gap:0}}
+.tg{display:inline-block;font-size:.68rem;padding:0 7px;border-radius:99px;margin-left:6px;background:var(--card2);border:1px solid var(--line);color:var(--mute)}
+.tg.dlc{background:var(--acc);border-color:var(--acc);color:var(--accink);font-weight:600}
+@media(max-width:560px){.mid{grid-template-columns:1fr}.bubble::before,.bubble::after{display:none}.loc{flex-direction:column;gap:0}}
 .chip{border:1px solid var(--line);background:var(--card2);color:var(--ink);border-radius:99px;padding:5px 12px;font:inherit;font-size:.85rem;cursor:pointer;margin:0 6px 6px 0}
 .chip small{color:var(--mute);margin-left:4px}
 .mute{color:var(--mute);font-size:.85rem}
@@ -233,7 +239,7 @@ async function evolution() {
   return paths.slice(0, 6).map(p => `<div class="evo">${p.map((e, i) => `${i ? `<span class="mute">→ ${esc(e.c)}</span>` : ""}<button class="chip" data-n="${esc(e.name)}"><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${e.id}.png" alt="" style="width:32px;height:32px;image-rendering:pixelated;vertical-align:middle"> ${esc(pretty(e.name))}</button>`).join("")}</div>`).join("");
 }
 
-async function coverMons(weak, typeData, cover) {
+async function coverMons(weak, typeData, cover, avail) {
   if (!weak.length || !cover.length) return "";
   const TD = {}; typeData.forEach(t => TD[t.name] = t);
   const pop = {};
@@ -241,7 +247,7 @@ async function coverMons(weak, typeData, cover) {
     try { const raw = await j(STATS_FILE(f)); Object.entries(raw.data).forEach(([k, v]) => pop[norm(k)] = v.n || 0); break; } catch (e) {}
   }
   const seen = new Map();
-  cover.forEach(t => TD[t].pokemon.forEach(p => { const id = +p.pokemon.url.split("/").filter(Boolean).pop(); if (id <= 1025 && id !== mon.id) seen.set(p.pokemon.name, p.pokemon.url); }));
+  cover.forEach(t => TD[t].pokemon.forEach(p => { const id = +p.pokemon.url.split("/").filter(Boolean).pop(); if (id <= 1025 && id !== mon.id && (!avail || avail.has(id))) seen.set(p.pokemon.name, p.pokemon.url); }));
   const cands = [...seen].sort((a, b) => (pop[norm(b[0])] || 0) - (pop[norm(a[0])] || 0)).slice(0, 16);
   const data = (await Promise.all(cands.map(c => j(c[1]).catch(() => null)))).filter(Boolean);
   const mul = (types, atk) => types.reduce((m, t) => { const r = TD[t].damage_relations; return m * (r.no_damage_from.some(x => x.name === atk) ? 0 : r.double_damage_from.some(x => x.name === atk) ? 2 : r.half_damage_from.some(x => x.name === atk) ? .5 : 1); }, 1);
@@ -277,7 +283,8 @@ async function casual() {
   const weak = Object.keys(mult).filter(t => mult[t] > 1);
   const tr = await Promise.all(Object.keys(TC).map(t => j(`${POKEAPI}/type/${t}`)));
   const cover = tr.filter(t => { const half = [...t.damage_relations.half_damage_from, ...t.damage_relations.no_damage_from].map(x => x.name); return weak.length && weak.filter(w => half.includes(w)).length >= Math.max(1, weak.length - 1); }).map(t => t.name);
-  const covers = await coverMons(weak, tr, cover).catch(() => "");
+  const avail = await availSpecies(G()).catch(() => null);
+  const covers = await coverMons(weak, tr, cover, avail).catch(() => "");
 
   const lv = mon.moves.map(m => { const d = m.version_group_details.find(v => v.version_group.name === GAME && v.move_learn_method.name === "level-up"); return d ? [d.level_learned_at, m.move.name, m.move.url] : null; }).filter(Boolean).sort((a, b) => a[0] - b[0]);
   const lvd = await Promise.all(lv.map(x => j(x[2]).catch(() => null)));
@@ -316,60 +323,108 @@ async function casual() {
    ${roles}
    <div class="card"><details><summary style="cursor:pointer;color:var(--acc)">Todos os golpes por nível</summary>${lv.map(([l, n], i) => { const o = lvd[i]; return `<div class="lvrow"><span class="mute lvl">Lv ${l || "—"}</span>${o ? badge(o.type.name) + cls(o.damage_class.name) : ""}<span>${esc(o ? enName(o, pretty(n)) : pretty(n))}</span>${o && o.power ? `<span class="mute">· ${o.power}</span>` : ""}</div>`; }).join("") || none}</details></div>
   </div>
-  <aside class="card"><h3>Fraco contra</h3><div>${weak.map(t => badge(t) + '<span class="mute">×' + mult[t] + '</span> ').join("") || "Nada"}</div><h3 style="margin-top:14px">Tipos que cobrem as fraquezas</h3><div>${cover.map(badge).join("") || "—"}</div><h3 style="margin-top:14px">Pokémon que cobrem</h3>${covers || '<p class="mute">—</p>'}<span class="ev">Ordenados pelo uso no competitivo, quando há dados.</span></aside></div>`;
+  <aside class="card"><h3>Fraco contra</h3><div>${weak.map(t => badge(t) + '<span class="mute">×' + mult[t] + '</span> ').join("") || "Nada"}</div><h3 style="margin-top:14px">Tipos que cobrem as fraquezas</h3><div>${cover.map(badge).join("") || "—"}</div><h3 style="margin-top:14px">Pokémon que cobrem</h3>${covers || '<p class="mute">—</p>'}<span class="ev">Só Pokémon do jogo selecionado, ordenados pelo uso no competitivo quando há dados.</span></aside></div>`;
 }
 
 /* ---------- Tela ---------- */
-const VERS = ["red", "blue", "yellow", "gold", "silver", "crystal", "ruby", "sapphire", "emerald", "firered", "leafgreen", "diamond", "pearl", "platinum", "heartgold", "soulsilver", "black", "white", "black-2", "white-2", "x", "y", "omega-ruby", "alpha-sapphire", "sun", "moon", "ultra-sun", "ultra-moon", "lets-go-pikachu", "lets-go-eevee", "sword", "shield", "the-isle-of-armor", "the-crown-tundra", "brilliant-diamond", "shining-pearl", "legends-arceus", "scarlet", "violet"];
-const GNAME = { "lets-go-pikachu": "Let's Go Pikachu", "lets-go-eevee": "Let's Go Eevee", "firered": "FireRed", "leafgreen": "LeafGreen", "heartgold": "HeartGold", "soulsilver": "SoulSilver", "black-2": "Black 2", "white-2": "White 2", "omega-ruby": "Omega Ruby", "alpha-sapphire": "Alpha Sapphire", "ultra-sun": "Ultra Sun", "ultra-moon": "Ultra Moon", "the-isle-of-armor": "Isle of Armor", "the-crown-tundra": "Crown Tundra", "brilliant-diamond": "Brilliant Diamond", "shining-pearl": "Shining Pearl", "legends-arceus": "Legends: Arceus" };
+const GNAME = { "lets-go-pikachu": "Let's Go Pikachu", "lets-go-eevee": "Let's Go Eevee", "the-isle-of-armor": "Isle of Armor", "the-crown-tundra": "Crown Tundra", "the-teal-mask": "Teal Mask", "the-indigo-disk": "Indigo Disk", "legends-arceus": "Legends: Arceus", "black-2": "Black 2", "white-2": "White 2" };
 const gname = v => GNAME[v] || pretty(v);
 const SPR = { red: ["generation-i", "red-blue"], blue: ["generation-i", "red-blue"], yellow: ["generation-i", "yellow"], gold: ["generation-ii", "gold"], silver: ["generation-ii", "silver"], crystal: ["generation-ii", "crystal"], ruby: ["generation-iii", "ruby-sapphire"], sapphire: ["generation-iii", "ruby-sapphire"], emerald: ["generation-iii", "emerald"], firered: ["generation-iii", "firered-leafgreen"], leafgreen: ["generation-iii", "firered-leafgreen"], diamond: ["generation-iv", "diamond-pearl"], pearl: ["generation-iv", "diamond-pearl"], platinum: ["generation-iv", "platinum"], heartgold: ["generation-iv", "heartgold-soulsilver"], soulsilver: ["generation-iv", "heartgold-soulsilver"], black: ["generation-v", "black-white"], white: ["generation-v", "black-white"], "black-2": ["generation-v", "black-white"], "white-2": ["generation-v", "black-white"], x: ["generation-vi", "x-y"], y: ["generation-vi", "x-y"], "omega-ruby": ["generation-vi", "omegaruby-alphasapphire"], "alpha-sapphire": ["generation-vi", "omegaruby-alphasapphire"], sun: ["generation-vii", "ultra-sun-ultra-moon"], moon: ["generation-vii", "ultra-sun-ultra-moon"], "ultra-sun": ["generation-vii", "ultra-sun-ultra-moon"], "ultra-moon": ["generation-vii", "ultra-sun-ultra-moon"] };
+// Jogos agrupados: pares da mesma geração ficam juntos e as DLCs entram no jogo original.
+const GROUPS = [
+  { id: "rb", gen: "I", name: "Red / Blue", vs: ["red", "blue"] },
+  { id: "y", gen: "I", name: "Yellow", vs: ["yellow"] },
+  { id: "gs", gen: "II", name: "Gold / Silver", vs: ["gold", "silver"] },
+  { id: "c", gen: "II", name: "Crystal", vs: ["crystal"] },
+  { id: "rs", gen: "III", name: "Ruby / Sapphire", vs: ["ruby", "sapphire"] },
+  { id: "e", gen: "III", name: "Emerald", vs: ["emerald"] },
+  { id: "frlg", gen: "III", name: "FireRed / LeafGreen", vs: ["firered", "leafgreen"] },
+  { id: "cxd", gen: "III", name: "Colosseum / XD", vs: ["colosseum", "xd"] },
+  { id: "dp", gen: "IV", name: "Diamond / Pearl", vs: ["diamond", "pearl"] },
+  { id: "pt", gen: "IV", name: "Platinum", vs: ["platinum"] },
+  { id: "hgss", gen: "IV", name: "HeartGold / SoulSilver", vs: ["heartgold", "soulsilver"] },
+  { id: "bw", gen: "V", name: "Black / White", vs: ["black", "white"] },
+  { id: "b2w2", gen: "V", name: "Black 2 / White 2", vs: ["black-2", "white-2"] },
+  { id: "xy", gen: "VI", name: "X / Y", vs: ["x", "y"] },
+  { id: "oras", gen: "VI", name: "Omega Ruby / Alpha Sapphire", vs: ["omega-ruby", "alpha-sapphire"] },
+  { id: "sm", gen: "VII", name: "Sun / Moon", vs: ["sun", "moon"] },
+  { id: "usum", gen: "VII", name: "Ultra Sun / Ultra Moon", vs: ["ultra-sun", "ultra-moon"] },
+  { id: "lg", gen: "VII", name: "Let's Go Pikachu / Eevee", vs: ["lets-go-pikachu", "lets-go-eevee"] },
+  { id: "swsh", gen: "VIII", name: "Sword / Shield", vs: ["sword", "shield"], dlc: ["the-isle-of-armor", "the-crown-tundra"] },
+  { id: "bdsp", gen: "VIII", name: "Brilliant Diamond / Shining Pearl", vs: ["brilliant-diamond", "shining-pearl"] },
+  { id: "pla", gen: "VIII", name: "Legends: Arceus", vs: ["legends-arceus"] },
+  { id: "sv", gen: "IX", name: "Scarlet / Violet", vs: ["scarlet", "violet"], dlc: ["the-teal-mask", "the-indigo-disk"] }
+];
+let curGames = [];
+const G = () => curGames.find(g => g.id === game);
+const allVers = g => [...g.vs, ...(g.dlc || [])];
 
 function gamesOf() {
   const set = new Set();
   (mon.sp ? mon.sp.flavor_text_entries : []).forEach(e => { if (e.language.name === "en") set.add(e.version.name); });
   mon.enc.forEach(l => l.version_details.forEach(v => set.add(v.version.name)));
-  return VERS.filter(v => set.has(v)).concat([...set].filter(v => !VERS.includes(v)));
+  const known = new Set(GROUPS.flatMap(allVers));
+  return GROUPS.filter(g => allVers(g).some(v => set.has(v))).concat([...set].filter(v => !known.has(v)).map(v => ({ id: v, gen: "Outros", name: gname(v), vs: [v] })));
 }
 function artFor(g) {
-  const s = mon.sprites, e = SPR[g], v = e && s.versions && s.versions[e[0]] && s.versions[e[0]][e[1]];
+  const s = mon.sprites, e = g && SPR[g.vs[0]], v = e && s.versions && s.versions[e[0]] && s.versions[e[0]][e[1]];
   if (v) { const a = (v.animated && v.animated.front_default) || v.front_default; if (a) return [a, true]; }
   return [((s.other || {})["official-artwork"] || {}).front_default || ((s.other || {}).home || {}).front_default || s.front_default, false];
 }
 function descFor(g) {
   const fl = mon.sp ? mon.sp.flavor_text_entries.filter(e => e.language.name === "en") : [];
-  const e = fl.find(x => x.version.name === g) || fl[fl.length - 1];
+  const e = (g && (fl.find(x => g.vs.includes(x.version.name)) || fl.find(x => (g.dlc || []).includes(x.version.name)))) || fl[fl.length - 1];
   return e ? e.flavor_text.replace(/[\n\f\u00ad]/g, " ").replace(/\s+/g, " ").trim() : "";
 }
 function locsFor(g) {
+  if (!g) return [];
   const out = [];
   mon.enc.forEach(l => {
-    const v = l.version_details.find(x => x.version.name === g); if (!v) return;
-    const lv = v.encounter_details.reduce((a, d) => [Math.min(a[0], d.min_level), Math.max(a[1], d.max_level)], [999, 0]);
-    out.push({ n: pretty(l.location_area.name.replace(/-area$/, "")), lv, m: [...new Set(v.encounter_details.map(d => pretty(d.method.name)))].join(", "), ch: v.max_chance });
+    const base = [], dlc = [], det = [];
+    l.version_details.forEach(v => { const n = v.version.name; if (g.vs.includes(n)) base.push(n); else if ((g.dlc || []).includes(n)) dlc.push(n); else return; det.push(v); });
+    if (!det.length) return;
+    let lo = 999, hi = 0, ch = 0; const ms = new Set();
+    det.forEach(v => { ch = Math.max(ch, v.max_chance); v.encounter_details.forEach(d => { lo = Math.min(lo, d.min_level); hi = Math.max(hi, d.max_level); ms.add(pretty(d.method.name)); }); });
+    let tag = "";
+    if (!base.length) tag = "DLC · " + dlc.map(gname).join(", ");
+    else if (g.vs.length > 1 && base.length < g.vs.length) tag = "só " + base.map(gname).join(", ");
+    out.push({ n: pretty(l.location_area.name.replace(/-area$/, "")), lv: [lo, hi], m: [...ms].join(", "), ch, tag, dlc: !base.length });
   });
-  return out;
+  return out.sort((a, b) => a.dlc - b.dlc);
+}
+const availCache = {};
+async function availSpecies(g) {
+  if (!g) return null;
+  if (availCache[g.id]) return availCache[g.id];
+  const vgs = new Set(), dexes = new Set(), ids = new Set();
+  await Promise.all(allVers(g).map(async v => { try { vgs.add((await j(`${POKEAPI}/version/${v}`)).version_group.url); } catch (e) {} }));
+  await Promise.all([...vgs].map(async u => { try { (await j(u)).pokedexes.forEach(d => dexes.add(d.url)); } catch (e) {} }));
+  await Promise.all([...dexes].map(async u => { try { (await j(u)).pokemon_entries.forEach(e => ids.add(+e.pokemon_species.url.split("/").filter(Boolean).pop())); } catch (e) {} }));
+  return ids.size ? (availCache[g.id] = ids) : null;
 }
 function renderGame() {
-  const [src, pix] = artFor(game), img = $("art");
+  const g = G(), [src, pix] = artFor(g), img = $("art");
   img.src = src; img.style.imageRendering = pix ? "pixelated" : "auto";
-  const d = descFor(game), el = $("desc");
+  const d = descFor(g), el = $("desc");
   el.dataset.tr = d; el.textContent = d;
   if (d) translateAll($("hdr"), renderTab.id);
-  const L = locsFor(game);
+  const L = locsFor(g);
   $("locs").innerHTML = L.length
-    ? L.map(x => `<div class="loc"><b>${esc(x.n)}</b><span class="mute">Lv ${x.lv[0] === x.lv[1] ? x.lv[0] : x.lv[0] + "–" + x.lv[1]} · ${esc(x.m)} · ${x.ch}%</span></div>`).join("")
+    ? L.map(x => `<div class="loc"><span><b>${esc(x.n)}</b>${x.tag ? `<span class="tg${x.dlc ? " dlc" : ""}">${esc(x.tag)}</span>` : ""}</span><span class="mute">${x.lv[1] ? "Lv " + (x.lv[0] === x.lv[1] ? x.lv[0] : x.lv[0] + "–" + x.lv[1]) + " · " : ""}${esc(x.m)} · ${x.ch}%</span></div>`).join("")
     : '<p class="mute" style="margin:0">A PokéAPI não tem locais para este jogo (pode ser presente, troca, evento ou um jogo sem esses dados).</p>';
 }
 
 function shell() {
-  const m = mon, games = gamesOf();
-  if (!games.includes(game)) game = games[games.length - 1] || "";
-  const sel = games.length ? `<select id="game" aria-label="Jogo">${games.map(g => `<option value="${g}"${g === game ? " selected" : ""}>${esc(gname(g))}</option>`).join("")}</select>` : "";
+  const m = mon;
+  curGames = gamesOf();
+  if (!curGames.some(g => g.id === game)) game = curGames.length ? curGames[curGames.length - 1].id : "";
+  const gens = [...new Set(curGames.map(g => g.gen))];
+  const sel = curGames.length ? `<select id="game" aria-label="Jogo">${gens.map(gn => `<optgroup label="${gn === "Outros" ? "Outros" : "Geração " + gn}">${curGames.filter(g => g.gen === gn).map(g => `<option value="${g.id}"${g.id === game ? " selected" : ""}>${esc(g.name)}</option>`).join("")}</optgroup>`).join("")}</select>` : "";
   const genus = m.sp ? ((m.sp.genera || []).find(x => x.language.name === "en") || {}).genus : "";
-  return `<div class="card hd" id="hdr"><div class="hl"><img id="art" alt="${esc(pretty(m.name))}"></div>
-  <div class="hr"><h2>${esc(pretty(m.name))} <small class="mute">#${m.id}${genus ? " · " + esc(genus) : ""}</small></h2><div>${m.types.map(t => badge(t.type.name)).join("")}</div><p class="desc" id="desc"></p></div>
-  <div class="sts">${m.stats.map((s, i) => `<div class="s"><span>${NS[i]}</span><b>${s.base_stat}</b><div class="bar"><i style="width:${Math.min(100, s.base_stat / 1.6)}%"></i></div></div>`).join("")}</div>
+  return `<div class="card hd" id="hdr">
+  <div class="top"><img id="art" alt="${esc(pretty(m.name))}"><div class="hr"><h2>${esc(pretty(m.name))} <small class="mute">#${m.id}${genus ? " · " + esc(genus) : ""}</small></h2><div>${m.types.map(t => badge(t.type.name)).join("")}</div></div></div>
+  <div class="mid"><div class="sts">${m.stats.map((s, i) => `<div class="s"><span>${NS[i]}</span><b>${s.base_stat}</b><div class="bar"><i style="width:${Math.min(100, s.base_stat / 1.6)}%"></i></div></div>`).join("")}</div>
+  <div class="bubble"><p id="desc"></p></div></div>
   <div class="where"><div class="wh"><b>Onde encontrar</b>${sel}</div><div id="locs" class="locs"></div></div></div>
   <div class="tabs" role="tablist">${MODES.map(x => `<button class="tab" role="tab" data-m="${x[0]}" aria-selected="${x[0] === mode}">${x[1]}</button>`).join("")}</div><div id="tab"></div>`;
 }
@@ -395,7 +450,7 @@ async function show(raw) {
   $("out").innerHTML = shell(); renderGame(); renderTab();
 }
 
-document.addEventListener("change", e => { if (e.target.id === "game") { game = e.target.value; renderGame(); } });
+document.addEventListener("change", e => { if (e.target.id === "game") { game = e.target.value; renderGame(); if (mode === "casual") renderTab(); } });
 document.addEventListener("click", e => {
   const n = e.target.closest("[data-n]"), t = e.target.closest("[data-m]");
   if (n) show(n.dataset.n);
