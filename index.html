@@ -90,6 +90,27 @@ select{font:inherit;font-size:.85rem;padding:5px 8px;border-radius:8px;border:1p
 .mvchip small{color:var(--acc);margin-left:4px;font-weight:600}
 .layout.solo{grid-template-columns:1fr}
 .tip{font-size:.82rem;margin:6px 0 4px;line-height:1.45}
+#team{position:sticky;top:0;z-index:6;margin:10px 0}
+.tbar{padding:8px 12px;margin:0;box-shadow:0 6px 16px rgba(0,0,0,.4)}
+.thead{display:flex;align-items:center;gap:8px;font-size:.88rem;flex-wrap:wrap}
+.thead .grow{flex:1}.thead .chip{margin:0}
+.slots{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:6px}
+.slot{position:relative;border:1px solid var(--line);border-radius:10px;background:var(--card2);min-height:62px;display:flex;align-items:center;justify-content:center}
+.slot.empty{border-style:dashed;color:var(--mute);font-size:1.2rem}
+.slotmon{background:none;border:0;color:var(--ink);font:inherit;font-size:.7rem;cursor:pointer;display:flex;flex-direction:column;align-items:center;padding:2px;width:100%;min-width:0}
+.slotmon img{width:40px;height:40px;image-rendering:pixelated}
+.slotmon span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rm{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;line-height:1;font-size:.85rem;padding:0}
+.addbtn{border:1px solid var(--acc);background:transparent;color:var(--acc);border-radius:8px;padding:3px 10px;font:600 .8rem "Poppins",system-ui,sans-serif;cursor:pointer;margin-top:6px}
+.addbtn.sm{padding:2px 9px;margin:0;flex:none}
+.addbtn.on{background:var(--acc);color:var(--accink)}
+.mrow{display:flex;align-items:center;gap:6px}.mrow .mate{flex:1;min-width:0}
+.ttab{border-collapse:collapse;font-size:.78rem;width:100%}
+.ttab th,.ttab td{padding:3px 4px;text-align:center;border-bottom:1px solid var(--line)}
+.ttab th img{width:28px;height:28px;image-rendering:pixelated}
+.ttab tr.bad{background:rgba(255,85,96,.12)}
+.ttab .w4{background:#d62f3a;color:#fff}.ttab .w2{background:#e8622a;color:#fff}.ttab .r2{background:#2f8f4e;color:#fff}.ttab .r4{background:#1f6b3a;color:#fff}.ttab .r0{background:#444a5e;color:#fff}
+@media(max-width:560px){.slotmon span{display:none}.slot{min-height:48px}}
 .chip{margin:0}
 .sc{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:0 0 10px}
 .sc>b{font-size:.95rem}
@@ -112,6 +133,8 @@ a{color:var(--acc)}
 <p class="sub">Digite o nome, escolha o formato e veja golpes, itens, natureza e companheiros de time.</p>
 <input id="q" list="names" placeholder="Ex.: Garchomp" aria-label="Nome do Pokémon" autocomplete="off">
 <datalist id="names"></datalist>
+<div id="team"></div>
+<div id="tanalysis"></div>
 <div id="out"></div>
 <p class="mute" id="foot"></p>
 </main>
@@ -164,6 +187,71 @@ async function tr(t) {
 function translateAll(root, my) {
   root.querySelectorAll("[data-tr]").forEach(el => { const txt = el.dataset.tr; tr(txt).then(v => { if (renderTab.id === my && el.dataset.tr === txt) el.textContent = v; }); });
 }
+// ================= Montador de time (etapa 1) =================
+let team = (() => { try { return JSON.parse(localStorage.getItem("pkteam1") || "[]"); } catch (e) { return []; } })();
+let tanOpen = false;
+const saveTeam = () => { try { localStorage.setItem("pkteam1", JSON.stringify(team)); } catch (e) {} };
+const inTeam = n => team.some(m => norm(m.name) === norm(n));
+const addLabel = (n, small) => inTeam(n) ? (small ? "✓" : "✓ No time") : (small ? "+" : "+ Time");
+const addBtn = (n, small) => `<button class="addbtn${small ? " sm" : ""}${inTeam(n) ? " on" : ""}" data-add="${esc(n)}" data-small="${small ? 1 : 0}" title="${inTeam(n) ? "Remover do time" : "Adicionar ao time"}">${addLabel(n, small)}</button>`;
+function refreshAddButtons() {
+  document.querySelectorAll("[data-add]").forEach(b => { const n = b.dataset.add, on = inTeam(n); b.textContent = addLabel(n, b.dataset.small === "1"); b.classList.toggle("on", on); b.title = on ? "Remover do time" : "Adicionar ao time"; });
+}
+function tmsg(t) { const el = $("tmsg"); if (el) { el.textContent = t; setTimeout(() => { if (el.textContent === t) el.textContent = ""; }, 2500); } }
+
+let TDp = null;
+const typeData = () => TDp || (TDp = Promise.all(Object.keys(TC).map(t => j(`${POKEAPI}/type/${t}`))).then(a => { const o = {}; a.forEach(t => o[t.name] = t); return o; }).catch(e => { TDp = null; throw e; }));
+const mulT = (TD, types, atk) => types.reduce((m, t) => { const r = TD[t].damage_relations; return m * (r.no_damage_from.some(x => x.name === atk) ? 0 : r.double_damage_from.some(x => x.name === atk) ? 2 : r.half_damage_from.some(x => x.name === atk) ? .5 : 1); }, 1);
+const weakTypes = TD => Object.keys(TC).filter(t => { const ms = team.map(m => mulT(TD, m.types, t)); return ms.filter(x => x > 1).length > ms.filter(x => x < 1).length; });
+
+async function addToTeam(raw) {
+  if (team.length >= 6) { tmsg("O time já tem 6 Pokémon."); return; }
+  const sl = slug(raw); let p = null;
+  for (const id of [sl, sl.split("-")[0]]) { try { p = await j(`${POKEAPI}/pokemon/${id}`); break; } catch (e) {} }
+  if (!p) { tmsg("Não consegui adicionar " + raw + "."); return; }
+  if (team.some(m => m.id === p.id)) return;
+  team.push({ name: p.name, id: p.id, types: p.types.map(t => t.type.name), sprite: p.sprites.front_default || "" });
+  saveTeam(); renderTeam(); refreshAddButtons();
+}
+function removeFromTeam(i) { team.splice(i, 1); saveTeam(); renderTeam(); refreshAddButtons(); }
+function toggleTeam(n) { const i = team.findIndex(m => norm(m.name) === norm(n)); if (i >= 0) removeFromTeam(i); else addToTeam(n); }
+
+function renderTeam() {
+  const slots = Array.from({ length: 6 }, (_, i) => team[i]
+    ? `<div class="slot"><button class="slotmon" data-n="${esc(team[i].name)}" title="Abrir ${esc(pretty(team[i].name))}"><img src="${team[i].sprite}" alt=""><span>${esc(pretty(team[i].name))}</span></button><button class="rm" data-rm="${i}" aria-label="Remover ${esc(pretty(team[i].name))}">×</button></div>`
+    : '<div class="slot empty">+</div>').join("");
+  $("team").innerHTML = `<div class="card tbar"><div class="thead"><b>Meu time (${team.length}/6)</b><span id="tmsg" class="mute"></span><span class="grow"></span>${team.length ? `<button class="chip${tanOpen ? " on" : ""}" data-tan>Análise</button><button class="chip" data-tclear>Limpar</button>` : '<span class="mute">Use o botão "+ Time" nos Pokémon</span>'}</div><div class="slots">${slots}</div></div>`;
+  fillAnalysis();
+}
+
+async function fillAnalysis() {
+  const box = $("tanalysis");
+  if (!tanOpen || !team.length) { box.innerHTML = ""; return; }
+  box.innerHTML = '<div class="card"><p class="mute" style="margin:0">Calculando…</p></div>';
+  let TD; try { TD = await typeData(); } catch (e) { box.innerHTML = '<div class="card"><p class="mute" style="margin:0">Não consegui carregar a tabela de tipos.</p></div>'; return; }
+  const fm = { 4: "4×", 2: "2×", .5: "½×", .25: "¼×", 0: "0" }, cl = { 4: "w4", 2: "w2", .5: "r2", .25: "r4", 0: "r0" };
+  const bad = weakTypes(TD);
+  const rows = Object.keys(TC).map(t => {
+    const ms = team.map(m => mulT(TD, m.types, t)), w = ms.filter(x => x > 1).length, r = ms.filter(x => x < 1).length;
+    return `<tr class="${bad.includes(t) ? "bad" : ""}"><th>${badge(t)}</th>${ms.map(x => x === 1 ? "<td></td>" : `<td class="${cl[x]}">${fm[x]}</td>`).join("")}<td>${w || ""}</td><td>${r || ""}</td></tr>`;
+  }).join("");
+  const head = `<tr><th></th>${team.map(m => `<th><img src="${m.sprite}" alt="${esc(pretty(m.name))}" title="${esc(pretty(m.name))}"></th>`).join("")}<th title="Pokémon fracos a esse tipo">Fr.</th><th title="Pokémon que resistem">Res.</th></tr>`;
+  const summary = bad.length ? `Atenção: mais Pokémon do time são fracos do que resistem a ${bad.map(t => pretty(t)).join(", ")}.` : "Nenhum tipo tem mais Pokémon fracos do que resistentes. Bom equilíbrio!";
+  box.innerHTML = `<div class="card"><h3>Análise do time</h3><div style="overflow-x:auto"><table class="ttab">${head}${rows}</table></div><p class="mute" style="margin:8px 0">${esc(summary)}</p><button class="chip" data-tc>Sugerir Pokémon que cobrem</button><div id="tcover" style="margin-top:8px"></div></div>`;
+}
+
+async function teamSuggest() {
+  const box = $("tcover"); if (!box) return;
+  box.innerHTML = '<p class="mute">Buscando…</p>';
+  try {
+    const TD = await typeData(), weak = weakTypes(TD);
+    if (!weak.length) { box.innerHTML = '<p class="mute">O time não tem fraquezas compartilhadas.</p>'; return; }
+    const cover = Object.keys(TC).map(t => ({ t, c: weak.filter(w => ["half_damage_from", "no_damage_from"].some(k => TD[t].damage_relations[k].some(x => x.name === w))).length })).filter(x => x.c).sort((a, b) => b.c - a.c).slice(0, 5).map(x => x.t);
+    const avail = await availSpecies(G()).catch(() => null);
+    box.innerHTML = (await coverMons(weak, Object.values(TD), cover, avail, new Set(team.map(m => m.id)))) || '<p class="mute">Nenhuma sugestão encontrada.</p>';
+  } catch (e) { box.innerHTML = '<p class="mute">Não consegui buscar sugestões agora.</p>'; }
+}
+
 let game = "", mon = null, mode = "comp", cfmt = "vgc";
 
 /* ---------- Dados competitivos ---------- */
@@ -216,7 +304,7 @@ async function competitive(kind) {
     }).join("") || none;
     const mateList = L("Teammates", 10);
     const sprites = await Promise.all(mateList.map(x => sprite(x.k)));
-    const mates = mateList.map((x, i) => `<button class="mate" data-n="${esc(x.k)}">${sprites[i] ? `<img src="${sprites[i]}" alt="">` : '<i class="ph"></i>'}<span class="mn">${esc(x.k)}</span><small>${pct(x.share)}</small></button>`).join("") || none;
+    const mates = mateList.map((x, i) => `<div class="mrow"><button class="mate" data-n="${esc(x.k)}">${sprites[i] ? `<img src="${sprites[i]}" alt="">` : '<i class="ph"></i>'}<span class="mn">${esc(x.k)}</span><small>${pct(x.share)}</small></button>${addBtn(x.k, true)}</div>`).join("") || none;
     left = `<p class="mute">Uso: estatísticas do Smogon, formato ${esc(st.format)}.</p>
   <div class="grid">
    <div class="card"><h3>Golpes</h3>${mRows}</div>
@@ -256,7 +344,7 @@ async function evolution() {
   return paths.slice(0, 6).map(p => `<div class="evo">${p.map((e, i) => `${i ? `<span class="mute">→ ${esc(e.c)}</span>` : ""}<button class="chip" data-n="${esc(e.name)}"><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${e.id}.png" alt="" style="width:32px;height:32px;image-rendering:pixelated;vertical-align:middle"> ${esc(pretty(e.name))}</button>`).join("")}</div>`).join("");
 }
 
-async function coverMons(weak, typeData, cover, avail) {
+async function coverMons(weak, typeData, cover, avail, exclude) {
   if (!weak.length || !cover.length) return "";
   const TD = {}; typeData.forEach(t => TD[t.name] = t);
   const pop = {};
@@ -264,13 +352,13 @@ async function coverMons(weak, typeData, cover, avail) {
     try { const raw = await j(STATS_FILE(f)); Object.entries(raw.data).forEach(([k, v]) => pop[norm(k)] = v.n || 0); break; } catch (e) {}
   }
   const seen = new Map();
-  cover.forEach(t => TD[t].pokemon.forEach(p => { const id = +p.pokemon.url.split("/").filter(Boolean).pop(); if (id <= 1025 && id !== mon.id && (!avail || avail.has(id))) seen.set(p.pokemon.name, p.pokemon.url); }));
+  cover.forEach(t => TD[t].pokemon.forEach(p => { const id = +p.pokemon.url.split("/").filter(Boolean).pop(); if (id <= 1025 && id !== (mon ? mon.id : 0) && !(exclude && exclude.has(id)) && (!avail || avail.has(id))) seen.set(p.pokemon.name, p.pokemon.url); }));
   const cands = [...seen].sort((a, b) => (pop[norm(b[0])] || 0) - (pop[norm(a[0])] || 0)).slice(0, 16);
   const data = (await Promise.all(cands.map(c => j(c[1]).catch(() => null)))).filter(Boolean);
   const mul = (types, atk) => types.reduce((m, t) => { const r = TD[t].damage_relations; return m * (r.no_damage_from.some(x => x.name === atk) ? 0 : r.double_damage_from.some(x => x.name === atk) ? 2 : r.half_damage_from.some(x => x.name === atk) ? .5 : 1); }, 1);
   const rows = data.map(p => { const ct = p.types.map(t => t.type.name), res = weak.filter(w => mul(ct, w) < 1), bad = weak.filter(w => mul(ct, w) > 1); return { p, ct, res, score: res.length * 2 - bad.length }; })
     .filter(x => x.res.length).sort((a, b) => b.score - a.score).slice(0, 6);
-  return rows.map(x => `<button class="mate" data-n="${esc(x.p.name)}"><img src="${x.p.sprites.front_default || ""}" alt=""><span class="mn"><b>${esc(pretty(x.p.name))}</b><br>${x.ct.map(badge).join("")}<br><span class="mute" style="font-size:.75rem">Resiste a: ${x.res.map(pretty).join(", ")}</span></span></button>`).join("") || '<p class="mute">Nenhuma sugestão encontrada.</p>';
+  return rows.map(x => `<div class="mrow"><button class="mate" data-n="${esc(x.p.name)}"><img src="${x.p.sprites.front_default || ""}" alt=""><span class="mn"><b>${esc(pretty(x.p.name))}</b><br>${x.ct.map(badge).join("")}<br><span class="mute" style="font-size:.75rem">Resiste a: ${x.res.map(pretty).join(", ")}</span></span></button>${addBtn(x.p.name, true)}</div>`).join("") || '<p class="mute">Nenhuma sugestão encontrada.</p>';
 }
 
 async function casual() {
@@ -469,7 +557,7 @@ function shell() {
   const sel = `<select id="game" aria-label="Jogo">${gens.map(gn => `<optgroup label="${gn === "Outros" ? "Outros" : "Geração " + gn}">${curGames.filter(g => g.gen === gn).map(g => `<option value="${g.id}"${g.id === game ? " selected" : ""}>${esc(g.name)}</option>`).join("")}</optgroup>`).join("")}</select>`;
   const genus = m.sp ? ((m.sp.genera || []).find(x => x.language.name === "en") || {}).genus : "";
   return `<div class="card hd" id="hdr">
-  <div class="top"><img id="art" alt="${esc(pretty(m.name))}"><div class="hr"><h2>${esc(pretty(m.name))} <small class="mute">#${m.id}${genus ? " · " + esc(genus) : ""}</small></h2><div>${m.types.map(t => badge(t.type.name)).join("")}</div></div></div>
+  <div class="top"><img id="art" alt="${esc(pretty(m.name))}"><div class="hr"><h2>${esc(pretty(m.name))} <small class="mute">#${m.id}${genus ? " · " + esc(genus) : ""}</small></h2><div>${m.types.map(t => badge(t.type.name)).join("")}</div>${addBtn(m.name, false)}</div></div>
   <div class="mid"><div class="sts">${m.stats.map((s, i) => `<div class="s"><span>${NS[i]}</span><b>${s.base_stat}</b><div class="bar"><i style="width:${Math.min(100, s.base_stat / 1.6)}%"></i></div></div>`).join("")}</div>
   <div class="bubble"><p id="desc"></p></div></div>
   <div class="where"><div class="wh"><b>Onde encontrar</b>${sel}</div><div id="locs" class="locs"></div></div></div>
@@ -638,6 +726,12 @@ document.addEventListener("change", e => { if (e.target.id === "game") { game = 
 document.addEventListener("click", e => {
   const n = e.target.closest("[data-n]"), t = e.target.closest("[data-m]");
   if (n) show(n.dataset.n);
+  const ad = e.target.closest("[data-add]"), rm = e.target.closest("[data-rm]");
+  if (ad) toggleTeam(ad.dataset.add);
+  if (rm) removeFromTeam(+rm.dataset.rm);
+  if (e.target.closest("[data-tclear]")) { team = []; saveTeam(); renderTeam(); refreshAddButtons(); }
+  if (e.target.closest("[data-tan]")) { tanOpen = !tanOpen; renderTeam(); }
+  if (e.target.closest("[data-tc]")) teamSuggest();
   const cf = e.target.closest("[data-cf]");
   if (cf) { cfmt = cf.dataset.cf; stier = null; renderTab(); }
   const sg = e.target.closest("[data-sg]"), st = e.target.closest("[data-st]");
@@ -648,6 +742,7 @@ document.addEventListener("click", e => {
 $("q").addEventListener("keydown", e => { if (e.key === "Enter") show($("q").value); });
 $("q").addEventListener("change", () => show($("q").value));
 
+renderTeam();
 j(`${POKEAPI}/pokemon?limit=1100`).then(d => { $("names").innerHTML = d.results.map(r => `<option value="${esc(pretty(r.name))}">`).join(""); }).catch(() => {});
 $("foot").innerHTML = '<b>Créditos</b><br>Estatísticas de uso, sets e estratégias: <a href="https://www.smogon.com" target="_blank" rel="noopener">Smogon</a> (<a href="https://www.smogon.com/stats/" target="_blank" rel="noopener">stats</a> e <a href="https://www.smogon.com/dex/" target="_blank" rel="noopener">Strategy Dex</a>), reunidos em formato aberto pelo projeto <a href="https://github.com/pkmn" target="_blank" rel="noopener">pkmn</a>. Sets do Random Battle e sprites animados: <a href="https://play.pokemonshowdown.com" target="_blank" rel="noopener">Pokémon Showdown</a>. Pokémon, golpes, itens, locais e imagens: <a href="https://pokeapi.co" target="_blank" rel="noopener">PokéAPI</a>. Tradução automática: <a href="https://mymemory.translated.net" target="_blank" rel="noopener">MyMemory</a>.<br>Projeto de fã, não oficial e sem vínculo com Nintendo, Game Freak, The Pokémon Company ou Smogon. Pokémon e seus nomes são marcas dos respectivos donos.';
 </script>
