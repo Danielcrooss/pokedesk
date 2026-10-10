@@ -118,6 +118,8 @@ textarea{width:100%;font:inherit;font-size:.8rem;background:var(--card2);color:v
 .shbtn{position:absolute;right:-4px;bottom:-2px;width:26px;height:26px;border-radius:50%;border:1px solid var(--line);background:var(--card2);cursor:pointer;font-size:.8rem;padding:0;filter:grayscale(1) opacity(.7)}
 .shbtn.on{filter:none;border-color:var(--acc)}
 .hint{grid-column:1/-1;margin:4px 0 0;font-size:.75rem}
+.errbar{background:#5b1f27;color:#ffd9dd;border:1px solid #ff5560;border-radius:10px;padding:8px 12px;margin:8px 0;font-size:.82rem;cursor:pointer}
+.errbar[hidden]{display:none}
 .chip{margin:0}
 .slots{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:6px}
 .slot{position:relative;border:1px solid var(--line);border-radius:10px;background:var(--card2);min-height:62px;display:flex;align-items:center;justify-content:center}
@@ -158,6 +160,7 @@ a{color:var(--acc)}
 <p class="sub">Digite o nome, escolha o formato e veja golpes, itens, natureza e companheiros de time.</p>
 <input id="q" list="names" placeholder="Ex.: Garchomp" aria-label="Nome do Pokémon" autocomplete="off">
 <datalist id="names"></datalist>
+<div id="errbar" class="errbar" hidden></div>
 <div id="team"></div>
 <div id="tanalysis"></div>
 <div id="tsets"></div>
@@ -176,7 +179,7 @@ const MODES = [["comp","Competitivo"],["casual","Casual"],["strat","Outras gera�
 const $ = id => document.getElementById(id);
 const cache = new Map();
 const j = async u => { if (cache.has(u)) return cache.get(u); const r = await fetch(u); if (!r.ok) throw new Error(r.status); const d = await r.json(); cache.set(u, d); return d; };
-const pretty = s => s.split("-").map(w => w[0].toUpperCase() + w.slice(1)).join(" ");
+const pretty = s => String(s).split("-").filter(Boolean).map(w => w[0].toUpperCase() + w.slice(1)).join(" ");
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const slug = s => s.toLowerCase().replace(/['’.]/g, "").replace(/\s+/g, "-");
 const norm = s => s.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -393,7 +396,7 @@ function freeChange(t) {
   fillIcons(+i);
 }
 
-async function fillSets() {
+async function fillSetsInner() {
   const box = $("tsets");
   if (!tsetOpen || !team.length) { box.innerHTML = ""; return; }
   const cfg = TFMT[tfmt], keepImp = $("timp") ? $("timp").value : "", anyFree = team.some(m => m.mode === "free");
@@ -442,6 +445,10 @@ async function fillSets() {
   fillIcons();
 }
 
+async function fillSets() {
+  try { await fillSetsInner(); }
+  catch (e) { const box = $("tsets"); if (box) box.innerHTML = `<div class="card"><p class="mute" style="margin:0">Não consegui montar o painel de sets (${esc(e.message)}). <button class="chip" data-treset>Voltar ao modo normal</button></p></div>`; }
+}
 function teamChange(t) {
   if (t.dataset.ts !== undefined && t.dataset.ts !== "") {
     const i = +t.dataset.ts, m = team[i];
@@ -947,8 +954,9 @@ document.addEventListener("click", e => {
   if (e.target.closest("[data-tan]")) { tanOpen = !tanOpen; renderTeam(); }
   if (e.target.closest("[data-tc]")) teamSuggest();
   if (e.target.closest("[data-tset]")) { tsetOpen = !tsetOpen; renderTeam(); }
+  if (e.target.closest("[data-treset]")) { team.forEach(m => { m.mode = "smogon"; }); saveTeam(); renderTeam(); }
   const mm = e.target.closest("[data-mm]");
-  if (mm) { const [i, md] = mm.dataset.mm.split(":"), m = team[+i]; if (m) { m.mode = md; if (md === "free" && !m.free) m.free = freeFrom(m); saveTeam(); renderTeam(); } }
+  if (mm) { const [i, md] = mm.dataset.mm.split(":"), m = team[+i]; if (m) { if (md === "free" && !m.free) m.free = freeFrom(m); m.mode = md; saveTeam(); renderTeam(); } }
   const sy = e.target.closest("[data-sys]");
   if (sy) { const [i, v] = sy.dataset.sys.split(":"), m = team[+i]; if (m && m.free) { m.free.sys = v; m.free.sysLock = true; if (v === "sp") EVK.forEach(([k]) => { m.free.ev[k] = Math.min(32, m.free.ev[k] || 0); }); saveTeam(); fillSets(); } }
   if (e.target.closest("[data-shiny]")) { shiny = !shiny; try { localStorage.setItem("pkshiny", shiny ? "1" : "0"); } catch (x) {} if (mon) renderGame(); }
@@ -968,6 +976,12 @@ $("q").addEventListener("change", () => show($("q").value));
 
 document.addEventListener("input", e => { const t = e.target; if (t && t.dataset && t.dataset.fr && t.classList && t.classList.contains("fin")) freeChange(t); });
 document.addEventListener("toggle", e => { const b = e.target && e.target.dataset && e.target.dataset.tbox; if (b === "ex") exOpen = e.target.open; else if (b === "im") imOpen = e.target.open; }, true);
+function showErr(m) { const b = $("errbar"); if (b && m) { b.hidden = false; b.textContent = "Ops, algo deu errado: " + m + " (clique para fechar). Se continuar, me mande esta mensagem."; } }
+if (typeof window !== "undefined" && window.addEventListener) {
+  window.addEventListener("error", e => showErr(e.message));
+  window.addEventListener("unhandledrejection", e => showErr((e.reason && e.reason.message) || String(e.reason)));
+  const eb = $("errbar"); if (eb) eb.addEventListener("click", () => { eb.hidden = true; });
+}
 renderTeam();
 j(`${POKEAPI}/pokemon?limit=1100`).then(d => { $("names").innerHTML = d.results.map(r => `<option value="${esc(pretty(r.name))}">`).join(""); }).catch(() => {});
 $("foot").innerHTML = '<b>Créditos</b><br>Estatísticas de uso, sets e estratégias: <a href="https://www.smogon.com" target="_blank" rel="noopener">Smogon</a> (<a href="https://www.smogon.com/stats/" target="_blank" rel="noopener">stats</a> e <a href="https://www.smogon.com/dex/" target="_blank" rel="noopener">Strategy Dex</a>), reunidos em formato aberto pelo projeto <a href="https://github.com/pkmn" target="_blank" rel="noopener">pkmn</a>. Sets do Random Battle e sprites animados: <a href="https://play.pokemonshowdown.com" target="_blank" rel="noopener">Pokémon Showdown</a>. Pokémon, golpes, itens, locais e imagens: <a href="https://pokeapi.co" target="_blank" rel="noopener">PokéAPI</a>. Tradução automática: <a href="https://mymemory.translated.net" target="_blank" rel="noopener">MyMemory</a>.<br>Projeto de fã, não oficial e sem vínculo com Nintendo, Game Freak, The Pokémon Company ou Smogon. Pokémon e seus nomes são marcas dos respectivos donos.';
