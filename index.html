@@ -117,6 +117,7 @@ textarea{width:100%;font:inherit;font-size:.8rem;background:var(--card2);color:v
 .artw{position:relative;flex:none}
 .shbtn{position:absolute;right:-4px;bottom:-2px;width:26px;height:26px;border-radius:50%;border:1px solid var(--line);background:var(--card2);cursor:pointer;font-size:.8rem;padding:0;filter:grayscale(1) opacity(.7)}
 .shbtn.on{filter:none;border-color:var(--acc)}
+.hint{grid-column:1/-1;margin:4px 0 0;font-size:.75rem}
 .chip{margin:0}
 .slots{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:6px}
 .slot{position:relative;border:1px solid var(--line);border-radius:10px;background:var(--card2);min-height:62px;display:flex;align-items:center;justify-content:center}
@@ -338,6 +339,7 @@ let exOpen = true, imOpen = false;
 const NATURES = ["Adamant", "Bashful", "Bold", "Brave", "Calm", "Careful", "Docile", "Gentle", "Hardy", "Hasty", "Impish", "Jolly", "Lax", "Lonely", "Mild", "Modest", "Naive", "Naughty", "Quiet", "Quirky", "Rash", "Relaxed", "Sassy", "Serious", "Timid"];
 const TERAS = [...Object.keys(TC).map(pretty), "Stellar"];
 const EVK = [["hp", "PS"], ["atk", "Atq"], ["def", "Def"], ["spa", "SpA"], ["spd", "SpD"], ["spe", "Vel"]];
+const sysOf = f => f.sysLock ? f.sys : (tfmt === "vgc" ? "sp" : "ev");
 const mbadge = t => badge(t).replace('class="tp"', 'class="tp mini"');
 
 // Set efetivo do membro: o do Smogon (com as opções escolhidas) ou o set livre.
@@ -380,7 +382,7 @@ function freeChange(t) {
   const [i, key] = t.dataset.fr.split(":"), m = team[+i];
   if (!m || !m.free) return;
   if (key.startsWith("ev-")) {
-    const max = tfmt === "vgc" ? 32 : 252, tot = tfmt === "vgc" ? 66 : 510, v = Math.max(0, Math.min(max, parseInt(t.value, 10) || 0));
+    const sp = sysOf(m.free) === "sp", max = sp ? 32 : 252, tot = sp ? 66 : 510, v = Math.max(0, Math.min(max, parseInt(t.value, 10) || 0));
     t.value = v; m.free.ev[key.slice(3)] = v;
     const sum = EVK.reduce((a, [k]) => a + (m.free.ev[k] || 0), 0), el = $("evt-" + i);
     if (el) { el.textContent = `Total ${sum}/${tot}`; el.style.color = sum > tot ? "#ff5560" : ""; }
@@ -404,7 +406,7 @@ async function fillSets() {
   const evField = (i, r, p) => { const alts = (r.evs || "").split(/\s+ou\s+/).filter(Boolean); if (!alts.length) return ""; return `<label class="fld"><span class="mute">EVs</span>${alts.length > 1 ? `<select data-tp="${i}:evs">${alts.map((x, k) => `<option value="${k}"${k === (p.evs || 0) ? " selected" : ""}>${esc(x)}</option>`).join("")}</select>` : `<span>${esc(alts[0])}</span>`}</label>`; };
   const opt = (list, cur) => `<option value=""></option>` + [...new Set([cur, ...list].filter(Boolean))].map(x => `<option${x === cur ? " selected" : ""}>${esc(x)}</option>`).join("");
   const freeEd = (m, i, pk) => {
-    const f = m.free, abil = pk ? pk.abilities.map(a => pretty(a.ability.name)) : [], mvs = pk ? [...new Set(pk.moves.map(x => pretty(x.move.name)))].sort() : [];
+    const f = m.free, sp = sysOf(f) === "sp", lim = sp ? { max: 32, tot: 66 } : { max: 252, tot: 510 }, abil = pk ? pk.abilities.map(a => pretty(a.ability.name)) : [], mvs = pk ? [...new Set(pk.moves.map(x => pretty(x.move.name)))].sort() : [];
     const inp = (key, val, list, ph) => `<input class="fin" data-fr="${i}:${key}" value="${esc(val || "")}" list="${list}" placeholder="${ph}" autocomplete="off">`;
     const tot = EVK.reduce((t, [k]) => t + (+f.ev[k] || 0), 0);
     return `<div class="smf free">
@@ -413,8 +415,9 @@ async function fillSets() {
       <label class="fld"><span class="mute">Natureza</span><select data-fr="${i}:nature">${opt(NATURES, f.nature)}</select></label>
       <label class="fld"><span class="mute">Tera</span>${fi(i, "tera")}<select data-fr="${i}:tera">${opt(TERAS, f.tera)}</select></label>
       ${[0, 1, 2, 3].map(k => `<label class="fld"><span class="mute">Golpe ${k + 1}</span>${fi(i, "m" + k)}${inp("m" + k, f.moves[k], "dl-mv-" + i, "Digite o golpe")}</label>`).join("")}
+      <div class="evg"><span class="mute">Sistema:</span><button class="chip${sp ? "" : " on"}" data-sys="${i}:ev">EVs (máx. 252 / total 510)</button><button class="chip${sp ? " on" : ""}" data-sys="${i}:sp">Pontos do Champions (máx. 32 / total 66)</button></div>
       <div class="evg">${EVK.map(([k, l]) => `<label><span class="mute">${l}</span><input type="number" min="0" max="${lim.max}" data-fr="${i}:ev-${k}" value="${f.ev[k] || 0}"></label>`).join("")}<span class="mute" id="evt-${i}" style="${tot > lim.tot ? "color:#ff5560" : ""}">Total ${tot}/${lim.tot}</span></div>
-      <datalist id="dl-mv-${i}">${mvs.map(x => `<option value="${esc(x)}">`).join("")}</datalist></div>`;
+      <p class="mute hint">Tudo é salvo enquanto você digita ou escolhe. O texto de exportação atualiza na hora.</p><datalist id="dl-mv-${i}">${mvs.map(x => `<option value="${esc(x)}">`).join("")}</datalist></div>`;
   };
   const rows = team.map((m, i) => {
     const free = m.mode === "free";
@@ -946,6 +949,8 @@ document.addEventListener("click", e => {
   if (e.target.closest("[data-tset]")) { tsetOpen = !tsetOpen; renderTeam(); }
   const mm = e.target.closest("[data-mm]");
   if (mm) { const [i, md] = mm.dataset.mm.split(":"), m = team[+i]; if (m) { m.mode = md; if (md === "free" && !m.free) m.free = freeFrom(m); saveTeam(); renderTeam(); } }
+  const sy = e.target.closest("[data-sys]");
+  if (sy) { const [i, v] = sy.dataset.sys.split(":"), m = team[+i]; if (m && m.free) { m.free.sys = v; m.free.sysLock = true; if (v === "sp") EVK.forEach(([k]) => { m.free.ev[k] = Math.min(32, m.free.ev[k] || 0); }); saveTeam(); fillSets(); } }
   if (e.target.closest("[data-shiny]")) { shiny = !shiny; try { localStorage.setItem("pkshiny", shiny ? "1" : "0"); } catch (x) {} if (mon) renderGame(); }
   const tf = e.target.closest("[data-tf]");
   if (tf) { tfmt = tf.dataset.tf; fillSets(); }
@@ -961,6 +966,7 @@ document.addEventListener("click", e => {
 $("q").addEventListener("keydown", e => { if (e.key === "Enter") show($("q").value); });
 $("q").addEventListener("change", () => show($("q").value));
 
+document.addEventListener("input", e => { const t = e.target; if (t && t.dataset && t.dataset.fr && t.classList && t.classList.contains("fin")) freeChange(t); });
 document.addEventListener("toggle", e => { const b = e.target && e.target.dataset && e.target.dataset.tbox; if (b === "ex") exOpen = e.target.open; else if (b === "im") imOpen = e.target.open; }, true);
 renderTeam();
 j(`${POKEAPI}/pokemon?limit=1100`).then(d => { $("names").innerHTML = d.results.map(r => `<option value="${esc(pretty(r.name))}">`).join(""); }).catch(() => {});
