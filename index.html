@@ -93,7 +93,17 @@ select{font:inherit;font-size:.85rem;padding:5px 8px;border-radius:8px;border:1p
 #team{position:sticky;top:0;z-index:6;margin:10px 0}
 .tbar{padding:8px 12px;margin:0;box-shadow:0 6px 16px rgba(0,0,0,.4)}
 .thead{display:flex;align-items:center;gap:8px;font-size:.88rem;flex-wrap:wrap}
-.thead .grow{flex:1}.thead .chip{margin:0}
+.thead .grow{flex:1}.thead .smem{border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:0 0 8px;background:var(--card2)}
+.smh{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.smh img{width:36px;height:36px;image-rendering:pixelated}
+.smh select{margin-left:auto;max-width:60%}
+.smf{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;margin-top:6px;font-size:.8rem}
+.fld{display:flex;align-items:center;gap:6px;min-width:0}
+.fld>.mute{width:62px;flex:none;font-size:.72rem}
+.fld select{max-width:100%;min-width:0;flex:1}
+textarea{width:100%;font:inherit;font-size:.8rem;background:var(--card2);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px;resize:vertical}
+@media(max-width:560px){.smf{grid-template-columns:1fr}.smh select{max-width:100%;margin-left:0;width:100%}}
+.chip{margin:0}
 .slots{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:6px}
 .slot{position:relative;border:1px solid var(--line);border-radius:10px;background:var(--card2);min-height:62px;display:flex;align-items:center;justify-content:center}
 .slot.empty{border-style:dashed;color:var(--mute);font-size:1.2rem}
@@ -135,6 +145,7 @@ a{color:var(--acc)}
 <datalist id="names"></datalist>
 <div id="team"></div>
 <div id="tanalysis"></div>
+<div id="tsets"></div>
 <div id="out"></div>
 <p class="mute" id="foot"></p>
 </main>
@@ -189,7 +200,7 @@ function translateAll(root, my) {
 }
 // ================= Montador de time (etapa 1) =================
 let team = (() => { try { return JSON.parse(localStorage.getItem("pkteam1") || "[]"); } catch (e) { return []; } })();
-let tanOpen = false;
+let tanOpen = false, tsetOpen = false, tfmt = "vgc";
 const saveTeam = () => { try { localStorage.setItem("pkteam1", JSON.stringify(team)); } catch (e) {} };
 const inTeam = n => team.some(m => norm(m.name) === norm(n));
 const addLabel = (n, small) => inTeam(n) ? (small ? "✓" : "✓ No time") : (small ? "+" : "+ Time");
@@ -218,10 +229,10 @@ function toggleTeam(n) { const i = team.findIndex(m => norm(m.name) === norm(n))
 
 function renderTeam() {
   const slots = Array.from({ length: 6 }, (_, i) => team[i]
-    ? `<div class="slot"><button class="slotmon" data-n="${esc(team[i].name)}" title="Abrir ${esc(pretty(team[i].name))}"><img src="${team[i].sprite}" alt=""><span>${esc(pretty(team[i].name))}</span></button><button class="rm" data-rm="${i}" aria-label="Remover ${esc(pretty(team[i].name))}">×</button></div>`
+    ? `<div class="slot"><button class="slotmon" data-n="${esc(team[i].name)}" title="Abrir ${esc(pretty(team[i].name))}${team[i].set ? " · " + esc(team[i].set.label) : ""}"><img src="${team[i].sprite}" alt=""><span>${esc(pretty(team[i].name))}</span></button><button class="rm" data-rm="${i}" aria-label="Remover ${esc(pretty(team[i].name))}">×</button></div>`
     : '<div class="slot empty">+</div>').join("");
-  $("team").innerHTML = `<div class="card tbar"><div class="thead"><b>Meu time (${team.length}/6)</b><span id="tmsg" class="mute"></span><span class="grow"></span>${team.length ? `<button class="chip${tanOpen ? " on" : ""}" data-tan>Análise</button><button class="chip" data-tclear>Limpar</button>` : '<span class="mute">Use o botão "+ Time" nos Pokémon</span>'}</div><div class="slots">${slots}</div></div>`;
-  fillAnalysis();
+  $("team").innerHTML = `<div class="card tbar"><div class="thead"><b>Meu time (${team.length}/6)</b><span id="tmsg" class="mute"></span><span class="grow"></span>${team.length ? `<button class="chip${tanOpen ? " on" : ""}" data-tan>Análise</button><button class="chip${tsetOpen ? " on" : ""}" data-tset>Sets e exportar</button><button class="chip" data-tclear>Limpar</button>` : '<span class="mute">Use o botão "+ Time" nos Pokémon</span>'}</div><div class="slots">${slots}</div></div>`;
+  fillAnalysis(); fillSets();
 }
 
 async function fillAnalysis() {
@@ -250,6 +261,107 @@ async function teamSuggest() {
     const avail = await availSpecies(G()).catch(() => null);
     box.innerHTML = (await coverMons(weak, Object.values(TD), cover, avail, new Set(team.map(m => m.id)))) || '<p class="mute">Nenhuma sugestão encontrada.</p>';
   } catch (e) { box.innerHTML = '<p class="mute">Não consegui buscar sugestões agora.</p>'; }
+}
+
+// ================= Montador de time (etapa 2): sets, exportar e importar =================
+const TFMT = {
+  vgc: { gen: "champions", label: "VGC Champions", keep: t => /^vgc/.test(t) },
+  vgcsv: { gen: "9", label: "VGC Scarlet/Violet", keep: t => /^vgc/.test(t) },
+  singles: { gen: "9", label: "Singles", keep: t => SINGLES_TIERS.includes(t) }
+};
+// Resolve as opções "A / B" do set de acordo com as escolhas feitas (pick).
+function resolveSet(set) {
+  if (!set) return null;
+  const p = set.pick || {}, r = set.raw;
+  const pk = (str, k) => { const o = splitSlash(str); return o[p[k] < o.length ? (p[k] || 0) : 0] || ""; };
+  return { label: set.label, moves: (r.moves || []).map((m, i) => pk(m, "m" + i)), item: pk(r.item, "item"), ability: pk(r.ability, "ab"), nature: pk(r.nature, "nat"), tera: pk(r.tera, "tera"), evs: (r.evs || "").split(/\s+ou\s+/)[p.evs || 0] || "", ivs: r.ivs || "" };
+}
+const toSD = s => (s || "").replace(/\bPS\b/g, "HP").replace(/\bAtq\b/g, "Atk").replace(/\bVel\b/g, "Spe");
+function exportTeam() {
+  return team.map(m => {
+    const s = resolveSet(m.set), L = [pretty(m.name) + (s && s.item ? " @ " + s.item : "")];
+    if (s) {
+      if (s.ability) L.push("Ability: " + s.ability);
+      if (s.tera) L.push("Tera Type: " + s.tera);
+      if (s.evs) L.push("EVs: " + toSD(s.evs));
+      if (s.nature) L.push(s.nature + " Nature");
+      if (s.ivs) L.push("IVs: " + toSD(s.ivs));
+      s.moves.filter(Boolean).forEach(x => L.push("- " + x));
+    }
+    return L.join("\n");
+  }).join("\n\n");
+}
+function parseShowdown(text) {
+  return text.split(/\n\s*\n/).map(b => b.trim()).filter(Boolean).slice(0, 6).map(b => {
+    const lines = b.split("\n").map(l => l.trim()).filter(Boolean), at = lines[0].split(" @ ");
+    const head = at[0].trim().replace(/\s*\((M|F)\)\s*$/, ""), nm = head.match(/\(([^()]+)\)\s*$/);
+    const set = { moves: [], item: (at[1] || "").trim(), ability: "", nature: "", evs: "", ivs: "", tera: "" };
+    lines.slice(1).forEach(l => { let x;
+      if (l.startsWith("- ")) set.moves.push(l.slice(2).trim());
+      else if ((x = l.match(/^Ability:\s*(.+)/i))) set.ability = x[1].trim();
+      else if ((x = l.match(/^Tera Type:\s*(.+)/i))) set.tera = x[1].trim();
+      else if ((x = l.match(/^EVs:\s*(.+)/i))) set.evs = x[1].trim();
+      else if ((x = l.match(/^IVs:\s*(.+)/i))) set.ivs = x[1].trim();
+      else if ((x = l.match(/^(\w+)\s+Nature/i))) set.nature = x[1]; });
+    return { species: (nm ? nm[1] : head).trim(), set };
+  });
+}
+async function importTeam(text) {
+  const parsed = parseShowdown(text), out = [];
+  if (!parsed.length) { tmsg("Nada para importar."); return; }
+  for (const { species, set } of parsed) {
+    const sl = slug(species); let p = null;
+    for (const id of [sl, sl.split("-")[0]]) { try { p = await j(`${POKEAPI}/pokemon/${id}`); break; } catch (e) {} }
+    if (!p) { tmsg("Não achei " + species + "."); continue; }
+    out.push({ name: p.name, id: p.id, types: p.types.map(t => t.type.name), sprite: p.sprites.front_default || "", set: set.moves.length || set.item ? { label: "Importado", raw: set, pick: {} } : null });
+  }
+  if (out.length) { team = out; saveTeam(); renderTeam(); refreshAddButtons(); tmsg(out.length + " importado(s)."); }
+}
+
+async function fillSets() {
+  const box = $("tsets");
+  if (!tsetOpen || !team.length) { box.innerHTML = ""; return; }
+  const cfg = TFMT[tfmt], keepImp = $("timp") ? $("timp").value : "";
+  let raw = null; try { raw = await j(`data/strategies/${cfg.gen}.json`); } catch (e) {}
+  const tnav = `<div class="gnav"><span class="mute">Sets do formato:</span>${Object.entries(TFMT).map(([k, v]) => `<button class="chip${k === tfmt ? " on" : ""}" data-tf="${k}">${v.label}</button>`).join("")}</div>`;
+  const field = (i, key, label, text, cur) => { const o = splitSlash(text); return text ? `<label class="fld"><span class="mute">${label}</span>${o.length > 1 ? `<select data-tp="${i}:${key}">${o.map((x, k) => `<option value="${k}"${k === cur ? " selected" : ""}>${esc(x)}</option>`).join("")}</select>` : `<span>${esc(o[0])}</span>`}</label>` : ""; };
+  const evField = (i, r, p) => { const alts = (r.evs || "").split(/\s+ou\s+/).filter(Boolean); if (!alts.length) return ""; return `<label class="fld"><span class="mute">EVs</span>${alts.length > 1 ? `<select data-tp="${i}:evs">${alts.map((x, k) => `<option value="${k}"${k === (p.evs || 0) ? " selected" : ""}>${esc(x)}</option>`).join("")}</select>` : `<span>${esc(alts[0])}</span>`}</label>`; };
+  const rows = team.map((m, i) => {
+    const byTier = raw ? setsFor(raw, pretty(m.name)) : {}, tiers = Object.keys(byTier).filter(cfg.keep).sort((a, b) => tierRank(a) - tierRank(b));
+    const opts = tiers.map(t => `<optgroup label="${esc(tierName(t))}">${byTier[t][0].sets.map((s, si) => `<option value="${t}|${si}">${esc(s.name)}</option>`).join("")}</optgroup>`).join("");
+    const sel = `<select data-ts="${i}"><option value="">${m.set ? "Atual: " + esc(m.set.label) : tiers.length ? "Escolher set…" : "Sem sets neste formato"}</option>${opts}${m.set ? '<option value="__none">Remover set</option>' : ""}</select>`;
+    let det = "";
+    if (m.set) {
+      const r = m.set.raw, p = m.set.pick || {};
+      det = `<div class="smf">${field(i, "item", "Item", r.item, p.item || 0)}${field(i, "ab", "Habilidade", r.ability, p.ab || 0)}${field(i, "nat", "Natureza", r.nature, p.nat || 0)}${field(i, "tera", "Tera", r.tera, p.tera || 0)}${evField(i, r, p)}${(r.moves || []).map((mv, k) => field(i, "m" + k, "Golpe " + (k + 1), mv, p["m" + k] || 0)).join("")}</div>`;
+    }
+    return `<div class="smem"><div class="smh"><img src="${esc(m.sprite)}" alt=""><b>${esc(pretty(m.name))}</b>${sel}</div>${det}</div>`;
+  }).join("");
+  box.innerHTML = `<div class="card"><h3>Sets e exportação</h3>${tnav}${raw ? "" : '<p class="mute">Ainda não há dados de sets. Rode o workflow no GitHub.</p>'}${rows}
+    <h3 style="margin-top:14px">Exportar (formato Showdown)</h3><textarea id="texp" readonly rows="8">${esc(exportTeam())}</textarea>
+    <div style="margin:6px 0 12px"><button class="chip" data-tcopy>Copiar time</button></div>
+    <h3>Importar</h3><textarea id="timp" rows="5" placeholder="Cole aqui um time no formato do Pokémon Showdown">${esc(keepImp)}</textarea>
+    <div style="margin-top:6px"><button class="chip" data-timp>Importar (substitui o time atual)</button></div></div>`;
+}
+
+function teamChange(t) {
+  if (t.dataset.ts !== undefined && t.dataset.ts !== "") {
+    const i = +t.dataset.ts, m = team[i];
+    if (!m || t.value === "") return;
+    if (t.value === "__none") m.set = null;
+    else {
+      const [tier, si] = t.value.split("|"), cfg = TFMT[tfmt];
+      j(`data/strategies/${cfg.gen}.json`).then(raw => {
+        const b = setsFor(raw, pretty(m.name))[tier], s = b && b[0].sets[+si];
+        if (s) { m.set = { label: tierName(tier) + " · " + s.name, raw: s, pick: {} }; saveTeam(); renderTeam(); }
+      }).catch(() => {});
+      return;
+    }
+    saveTeam(); renderTeam();
+  } else if (t.dataset.tp) {
+    const [i, key] = t.dataset.tp.split(":"), m = team[+i];
+    if (m && m.set) { m.set.pick = m.set.pick || {}; m.set.pick[key] = +t.value; saveTeam(); fillSets(); }
+  }
 }
 
 let game = "", mon = null, mode = "comp", cfmt = "vgc";
@@ -722,7 +834,7 @@ async function show(raw) {
   $("out").innerHTML = shell(); renderGame(); renderTab();
 }
 
-document.addEventListener("change", e => { if (e.target.id === "game") { game = e.target.value; renderGame(); if (mode === "casual") renderTab(); } });
+document.addEventListener("change", e => { if (e.target.id === "game") { game = e.target.value; renderGame(); if (mode === "casual") renderTab(); } teamChange(e.target); });
 document.addEventListener("click", e => {
   const n = e.target.closest("[data-n]"), t = e.target.closest("[data-m]");
   if (n) show(n.dataset.n);
@@ -732,6 +844,11 @@ document.addEventListener("click", e => {
   if (e.target.closest("[data-tclear]")) { team = []; saveTeam(); renderTeam(); refreshAddButtons(); }
   if (e.target.closest("[data-tan]")) { tanOpen = !tanOpen; renderTeam(); }
   if (e.target.closest("[data-tc]")) teamSuggest();
+  if (e.target.closest("[data-tset]")) { tsetOpen = !tsetOpen; renderTeam(); }
+  const tf = e.target.closest("[data-tf]");
+  if (tf) { tfmt = tf.dataset.tf; fillSets(); }
+  if (e.target.closest("[data-tcopy]")) { const t = exportTeam(); (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => tmsg("Time copiado!")).catch(() => { const x = $("texp"); if (x && x.select) { x.select(); tmsg("Selecione e copie (Ctrl+C)."); } }); }
+  if (e.target.closest("[data-timp]")) importTeam($("timp").value);
   const cf = e.target.closest("[data-cf]");
   if (cf) { cfmt = cf.dataset.cf; stier = null; renderTab(); }
   const sg = e.target.closest("[data-sg]"), st = e.target.closest("[data-st]");
