@@ -103,6 +103,20 @@ select{font:inherit;font-size:.85rem;padding:5px 8px;border-radius:8px;border:1p
 .fld select{max-width:100%;min-width:0;flex:1}
 textarea{width:100%;font:inherit;font-size:.8rem;background:var(--card2);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px;resize:vertical}
 @media(max-width:560px){.smf{grid-template-columns:1fr}.smh select{max-width:100%;margin-left:0;width:100%}}
+.fi{display:inline-flex;align-items:center;gap:2px;flex:none;min-width:0}
+.fi .ci{width:16px;height:16px}
+.tp.mini{min-width:0;padding:0 6px;font-size:.66rem;margin:0 2px 0 0;line-height:1.5}
+.fin{flex:1;min-width:0;font:inherit;font-size:.8rem;padding:3px 6px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+.smf.free .fld select{flex:1}
+.evg{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
+.evg label{display:flex;align-items:center;gap:4px}
+.evg input{width:54px;font:inherit;font-size:.8rem;padding:3px 4px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+.tbox{margin-top:10px;border-top:1px solid var(--line);padding-top:8px}
+.tbox>summary{cursor:pointer;font-weight:600;font-size:.95rem}
+.tbox[open]>summary{margin-bottom:6px}
+.artw{position:relative;flex:none}
+.shbtn{position:absolute;right:-4px;bottom:-2px;width:26px;height:26px;border-radius:50%;border:1px solid var(--line);background:var(--card2);cursor:pointer;font-size:.8rem;padding:0;filter:grayscale(1) opacity(.7)}
+.shbtn.on{filter:none;border-color:var(--acc)}
 .chip{margin:0}
 .slots{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:6px}
 .slot{position:relative;border:1px solid var(--line);border-radius:10px;background:var(--card2);min-height:62px;display:flex;align-items:center;justify-content:center}
@@ -200,6 +214,7 @@ function translateAll(root, my) {
 }
 // ================= Montador de time (etapa 1) =================
 let team = (() => { try { return JSON.parse(localStorage.getItem("pkteam1") || "[]"); } catch (e) { return []; } })();
+let shiny = (() => { try { return localStorage.getItem("pkshiny") === "1"; } catch (e) { return false; } })();
 let tanOpen = false, tsetOpen = false, tfmt = "vgc";
 const saveTeam = () => { try { localStorage.setItem("pkteam1", JSON.stringify(team)); } catch (e) {} };
 const inTeam = n => team.some(m => norm(m.name) === norm(n));
@@ -229,7 +244,7 @@ function toggleTeam(n) { const i = team.findIndex(m => norm(m.name) === norm(n))
 
 function renderTeam() {
   const slots = Array.from({ length: 6 }, (_, i) => team[i]
-    ? `<div class="slot"><button class="slotmon" data-n="${esc(team[i].name)}" title="Abrir ${esc(pretty(team[i].name))}${team[i].set ? " · " + esc(team[i].set.label) : ""}"><img src="${team[i].sprite}" alt=""><span>${esc(pretty(team[i].name))}</span></button><button class="rm" data-rm="${i}" aria-label="Remover ${esc(pretty(team[i].name))}">×</button></div>`
+    ? `<div class="slot"><button class="slotmon" data-n="${esc(team[i].name)}" title="Abrir ${esc(pretty(team[i].name))}${setLabel(team[i]) ? " · " + esc(setLabel(team[i])) : ""}"><img src="${team[i].sprite}" alt=""><span>${esc(pretty(team[i].name))}</span></button><button class="rm" data-rm="${i}" aria-label="Remover ${esc(pretty(team[i].name))}">×</button></div>`
     : '<div class="slot empty">+</div>').join("");
   $("team").innerHTML = `<div class="card tbar"><div class="thead"><b>Meu time (${team.length}/6)</b><span id="tmsg" class="mute"></span><span class="grow"></span>${team.length ? `<button class="chip${tanOpen ? " on" : ""}" data-tan>Análise</button><button class="chip${tsetOpen ? " on" : ""}" data-tset>Sets e exportar</button><button class="chip" data-tclear>Limpar</button>` : '<span class="mute">Use o botão "+ Time" nos Pokémon</span>'}</div><div class="slots">${slots}</div></div>`;
   fillAnalysis(); fillSets();
@@ -279,7 +294,7 @@ function resolveSet(set) {
 const toSD = s => (s || "").replace(/\bPS\b/g, "HP").replace(/\bAtq\b/g, "Atk").replace(/\bVel\b/g, "Spe");
 function exportTeam() {
   return team.map(m => {
-    const s = resolveSet(m.set), L = [pretty(m.name) + (s && s.item ? " @ " + s.item : "")];
+    const s = memberSet(m), L = [pretty(m.name) + (s && s.item ? " @ " + s.item : "")];
     if (s) {
       if (s.ability) L.push("Ability: " + s.ability);
       if (s.tera) L.push("Tera Type: " + s.tera);
@@ -318,30 +333,110 @@ async function importTeam(text) {
   if (out.length) { team = out; saveTeam(); renderTeam(); refreshAddButtons(); tmsg(out.length + " importado(s)."); }
 }
 
+// ================= Montador: set livre, ícones e painéis recolhíveis =================
+let exOpen = true, imOpen = false;
+const NATURES = ["Adamant", "Bashful", "Bold", "Brave", "Calm", "Careful", "Docile", "Gentle", "Hardy", "Hasty", "Impish", "Jolly", "Lax", "Lonely", "Mild", "Modest", "Naive", "Naughty", "Quiet", "Quirky", "Rash", "Relaxed", "Sassy", "Serious", "Timid"];
+const TERAS = [...Object.keys(TC).map(pretty), "Stellar"];
+const EVK = [["hp", "PS"], ["atk", "Atq"], ["def", "Def"], ["spa", "SpA"], ["spd", "SpD"], ["spe", "Vel"]];
+const mbadge = t => badge(t).replace('class="tp"', 'class="tp mini"');
+
+// Set efetivo do membro: o do Smogon (com as opções escolhidas) ou o set livre.
+function memberSet(m) {
+  if (m.mode === "free" && m.free) {
+    const f = m.free;
+    return { label: "Set livre", moves: f.moves, item: f.item || "", ability: f.ability || "", nature: f.nature || "", tera: f.tera || "", evs: EVK.filter(([k]) => f.ev[k]).map(([k, l]) => f.ev[k] + " " + l).join(" / "), ivs: "" };
+  }
+  return resolveSet(m.set);
+}
+const setLabel = m => m.mode === "free" ? "Set livre" : m.set ? m.set.label : "";
+function freeFrom(m) {
+  const s = resolveSet(m.set) || {}, ev = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
+  const map = { PS: "hp", HP: "hp", Atq: "atk", Atk: "atk", Def: "def", SpA: "spa", SpD: "spd", Vel: "spe", Spe: "spe" };
+  (s.evs || "").replace(/(\d+)\s*(PS|HP|Atq|Atk|Def|SpA|SpD|Vel|Spe)/g, (_, n, l) => { ev[map[l]] = +n; return ""; });
+  return { item: s.item || "", ability: s.ability || "", nature: s.nature || "", tera: s.tera || "", ev, moves: [0, 1, 2, 3].map(k => (s.moves || [])[k] || "") };
+}
+
+// Ícones discretos ao lado dos campos (item, tipo/categoria do golpe, tipo Tera).
+async function iconHtml(kind, value) {
+  if (!value) return "";
+  if (kind === "tera") return mbadge(value.toLowerCase());
+  if (kind === "item") {
+    const s = (await index("item"))[norm(value)]; if (!s) return "";
+    let o = null; try { o = await j(`${POKEAPI}/item/${s}`); } catch (e) {}
+    return itemImg(s, o, 18);
+  }
+  const s = (await index("move"))[norm(value)]; if (!s) return "";
+  try { const o = await j(`${POKEAPI}/move/${s}`); return mbadge(o.type.name) + cls(o.damage_class.name); } catch (e) { return ""; }
+}
+async function fillIcons(only) {
+  await Promise.all(team.flatMap((m, i) => {
+    if (only !== undefined && only !== i) return [];
+    const s = memberSet(m); if (!s) return [];
+    return [["item", "item", s.item], ["tera", "tera", s.tera], ...s.moves.map((mv, k) => ["m" + k, "move", mv])].map(async ([key, kind, val]) => { const el = $(`fi-${i}-${key}`); if (el) el.innerHTML = await iconHtml(kind, val); });
+  }));
+}
+
+function freeChange(t) {
+  const [i, key] = t.dataset.fr.split(":"), m = team[+i];
+  if (!m || !m.free) return;
+  if (key.startsWith("ev-")) {
+    const max = tfmt === "vgc" ? 32 : 252, tot = tfmt === "vgc" ? 66 : 510, v = Math.max(0, Math.min(max, parseInt(t.value, 10) || 0));
+    t.value = v; m.free.ev[key.slice(3)] = v;
+    const sum = EVK.reduce((a, [k]) => a + (m.free.ev[k] || 0), 0), el = $("evt-" + i);
+    if (el) { el.textContent = `Total ${sum}/${tot}`; el.style.color = sum > tot ? "#ff5560" : ""; }
+  } else if (/^m\d$/.test(key)) m.free.moves[+key.slice(1)] = t.value.trim();
+  else m.free[key] = t.value.trim();
+  saveTeam();
+  const x = $("texp"); if (x) x.value = exportTeam();
+  fillIcons(+i);
+}
+
 async function fillSets() {
   const box = $("tsets");
   if (!tsetOpen || !team.length) { box.innerHTML = ""; return; }
-  const cfg = TFMT[tfmt], keepImp = $("timp") ? $("timp").value : "";
+  const cfg = TFMT[tfmt], keepImp = $("timp") ? $("timp").value : "", anyFree = team.some(m => m.mode === "free");
   let raw = null; try { raw = await j(`data/strategies/${cfg.gen}.json`); } catch (e) {}
+  const [ii, info] = await Promise.all([anyFree ? index("item") : {}, Promise.all(team.map(m => m.mode === "free" ? j(`${POKEAPI}/pokemon/${m.name}`).catch(() => null) : null))]);
+  const lim = tfmt === "vgc" ? { max: 32, tot: 66 } : { max: 252, tot: 510 };
   const tnav = `<div class="gnav"><span class="mute">Sets do formato:</span>${Object.entries(TFMT).map(([k, v]) => `<button class="chip${k === tfmt ? " on" : ""}" data-tf="${k}">${v.label}</button>`).join("")}</div>`;
-  const field = (i, key, label, text, cur) => { const o = splitSlash(text); return text ? `<label class="fld"><span class="mute">${label}</span>${o.length > 1 ? `<select data-tp="${i}:${key}">${o.map((x, k) => `<option value="${k}"${k === cur ? " selected" : ""}>${esc(x)}</option>`).join("")}</select>` : `<span>${esc(o[0])}</span>`}</label>` : ""; };
+  const fi = (i, key) => `<span class="fi" id="fi-${i}-${key}"></span>`;
+  const field = (i, key, label, text, cur) => { const o = splitSlash(text); return text ? `<label class="fld"><span class="mute">${label}</span>${fi(i, key)}${o.length > 1 ? `<select data-tp="${i}:${key}">${o.map((x, k) => `<option value="${k}"${k === cur ? " selected" : ""}>${esc(x)}</option>`).join("")}</select>` : `<span>${esc(o[0])}</span>`}</label>` : ""; };
   const evField = (i, r, p) => { const alts = (r.evs || "").split(/\s+ou\s+/).filter(Boolean); if (!alts.length) return ""; return `<label class="fld"><span class="mute">EVs</span>${alts.length > 1 ? `<select data-tp="${i}:evs">${alts.map((x, k) => `<option value="${k}"${k === (p.evs || 0) ? " selected" : ""}>${esc(x)}</option>`).join("")}</select>` : `<span>${esc(alts[0])}</span>`}</label>`; };
+  const opt = (list, cur) => `<option value=""></option>` + [...new Set([cur, ...list].filter(Boolean))].map(x => `<option${x === cur ? " selected" : ""}>${esc(x)}</option>`).join("");
+  const freeEd = (m, i, pk) => {
+    const f = m.free, abil = pk ? pk.abilities.map(a => pretty(a.ability.name)) : [], mvs = pk ? [...new Set(pk.moves.map(x => pretty(x.move.name)))].sort() : [];
+    const inp = (key, val, list, ph) => `<input class="fin" data-fr="${i}:${key}" value="${esc(val || "")}" list="${list}" placeholder="${ph}" autocomplete="off">`;
+    const tot = EVK.reduce((t, [k]) => t + (+f.ev[k] || 0), 0);
+    return `<div class="smf free">
+      <label class="fld"><span class="mute">Item</span>${fi(i, "item")}${inp("item", f.item, "dl-item", "Ex.: Leftovers")}</label>
+      <label class="fld"><span class="mute">Habilidade</span><select data-fr="${i}:ability">${opt(abil, f.ability)}</select></label>
+      <label class="fld"><span class="mute">Natureza</span><select data-fr="${i}:nature">${opt(NATURES, f.nature)}</select></label>
+      <label class="fld"><span class="mute">Tera</span>${fi(i, "tera")}<select data-fr="${i}:tera">${opt(TERAS, f.tera)}</select></label>
+      ${[0, 1, 2, 3].map(k => `<label class="fld"><span class="mute">Golpe ${k + 1}</span>${fi(i, "m" + k)}${inp("m" + k, f.moves[k], "dl-mv-" + i, "Digite o golpe")}</label>`).join("")}
+      <div class="evg">${EVK.map(([k, l]) => `<label><span class="mute">${l}</span><input type="number" min="0" max="${lim.max}" data-fr="${i}:ev-${k}" value="${f.ev[k] || 0}"></label>`).join("")}<span class="mute" id="evt-${i}" style="${tot > lim.tot ? "color:#ff5560" : ""}">Total ${tot}/${lim.tot}</span></div>
+      <datalist id="dl-mv-${i}">${mvs.map(x => `<option value="${esc(x)}">`).join("")}</datalist></div>`;
+  };
   const rows = team.map((m, i) => {
+    const free = m.mode === "free";
     const byTier = raw ? setsFor(raw, pretty(m.name)) : {}, tiers = Object.keys(byTier).filter(cfg.keep).sort((a, b) => tierRank(a) - tierRank(b));
     const opts = tiers.map(t => `<optgroup label="${esc(tierName(t))}">${byTier[t][0].sets.map((s, si) => `<option value="${t}|${si}">${esc(s.name)}</option>`).join("")}</optgroup>`).join("");
-    const sel = `<select data-ts="${i}"><option value="">${m.set ? "Atual: " + esc(m.set.label) : tiers.length ? "Escolher set…" : "Sem sets neste formato"}</option>${opts}${m.set ? '<option value="__none">Remover set</option>' : ""}</select>`;
+    const sel = free ? "" : `<select data-ts="${i}"><option value="">${m.set ? "Atual: " + esc(m.set.label) : tiers.length ? "Escolher set…" : "Sem sets neste formato"}</option>${opts}${m.set ? '<option value="__none">Remover set</option>' : ""}</select>`;
+    const chips = `<div class="gnav" style="margin:6px 0 0"><button class="chip${free ? "" : " on"}" data-mm="${i}:smogon">Sets do formato</button><button class="chip${free ? " on" : ""}" data-mm="${i}:free">Set livre</button></div>`;
     let det = "";
-    if (m.set) {
+    if (free) det = freeEd(m, i, info[i]);
+    else if (m.set) {
       const r = m.set.raw, p = m.set.pick || {};
       det = `<div class="smf">${field(i, "item", "Item", r.item, p.item || 0)}${field(i, "ab", "Habilidade", r.ability, p.ab || 0)}${field(i, "nat", "Natureza", r.nature, p.nat || 0)}${field(i, "tera", "Tera", r.tera, p.tera || 0)}${evField(i, r, p)}${(r.moves || []).map((mv, k) => field(i, "m" + k, "Golpe " + (k + 1), mv, p["m" + k] || 0)).join("")}</div>`;
     }
-    return `<div class="smem"><div class="smh"><img src="${esc(m.sprite)}" alt=""><b>${esc(pretty(m.name))}</b>${sel}</div>${det}</div>`;
+    return `<div class="smem"><div class="smh"><img src="${esc(m.sprite)}" alt=""><b>${esc(pretty(m.name))}</b>${sel}</div>${chips}${det}</div>`;
   }).join("");
-  box.innerHTML = `<div class="card"><h3>Sets e exportação</h3>${tnav}${raw ? "" : '<p class="mute">Ainda não há dados de sets. Rode o workflow no GitHub.</p>'}${rows}
-    <h3 style="margin-top:14px">Exportar (formato Showdown)</h3><textarea id="texp" readonly rows="8">${esc(exportTeam())}</textarea>
-    <div style="margin:6px 0 12px"><button class="chip" data-tcopy>Copiar time</button></div>
-    <h3>Importar</h3><textarea id="timp" rows="5" placeholder="Cole aqui um time no formato do Pokémon Showdown">${esc(keepImp)}</textarea>
-    <div style="margin-top:6px"><button class="chip" data-timp>Importar (substitui o time atual)</button></div></div>`;
+  const itemList = anyFree ? `<datalist id="dl-item">${Object.values(ii).map(s => `<option value="${esc(pretty(s))}">`).join("")}</datalist>` : "";
+  box.innerHTML = `<div class="card"><h3>Sets e exportação</h3>${tnav}${raw ? "" : '<p class="mute">Ainda não há dados de sets. Rode o workflow no GitHub.</p>'}${rows}${itemList}
+    <details class="tbox" data-tbox="ex"${exOpen ? " open" : ""}><summary>Exportar (formato Showdown)</summary><textarea id="texp" readonly rows="8">${esc(exportTeam())}</textarea>
+      <div style="margin:6px 0 2px"><button class="chip" data-tcopy>Copiar time</button></div></details>
+    <details class="tbox" data-tbox="im"${imOpen ? " open" : ""}><summary>Importar</summary><textarea id="timp" rows="5" placeholder="Cole aqui um time no formato do Pokémon Showdown">${esc(keepImp)}</textarea>
+      <div style="margin-top:6px"><button class="chip" data-timp>Importar (substitui o time atual)</button></div></details></div>`;
+  fillIcons();
 }
 
 function teamChange(t) {
@@ -358,6 +453,8 @@ function teamChange(t) {
       return;
     }
     saveTeam(); renderTeam();
+  } else if (t.dataset.fr) {
+    freeChange(t);
   } else if (t.dataset.tp) {
     const [i, key] = t.dataset.tp.split(":"), m = team[+i];
     if (m && m.set) { m.set.pick = m.set.pick || {}; m.set.pick[key] = +t.value; saveTeam(); fillSets(); }
@@ -590,13 +687,13 @@ function versionsWithData() {
 }
 const ANIM_GENS = ["VI", "VII", "VIII", "IX"];
 function artFor(g) {
-  const s = mon.sprites, e = g && SPR[g.vs[0]], v = e && s.versions && s.versions[e[0]] && s.versions[e[0]][e[1]];
-  const still = ((s.other || {})["official-artwork"] || {}).front_default || ((s.other || {}).home || {}).front_default || s.front_default;
+  const s = mon.sprites, e = g && SPR[g.vs[0]], v = e && s.versions && s.versions[e[0]] && s.versions[e[0]][e[1]], k = shiny ? "front_shiny" : "front_default";
+  const still = ((s.other || {})["official-artwork"] || {})[k] || ((s.other || {}).home || {})[k] || s[k] || s.front_default;
   if (g && ANIM_GENS.includes(g.gen)) {
-    const n = mon.name, base = "https://play.pokemonshowdown.com/sprites/ani/";
+    const n = mon.name, base = "https://play.pokemonshowdown.com/sprites/" + (shiny ? "ani-shiny/" : "ani/");
     return [[base + n + ".gif", base + n.replace(/-/g, "") + ".gif", base + n.split("-")[0] + ".gif", still], false];
   }
-  if (v) { const a = (v.animated && v.animated.front_default) || v.front_default; if (a) return [[a, still], true]; }
+  if (v) { const a = (v.animated && v.animated[k]) || v[k]; if (a) return [[a, still], true]; }
   return [[still], false];
 }
 function descFor(g) {
@@ -639,6 +736,7 @@ async function availSpecies(g) {
 async function renderGame() {
   const my = (renderGame.n = (renderGame.n || 0) + 1), g = G(), [srcs, pix] = artFor(g), img = $("art");
   let k = 0; img.onerror = () => { k++; if (k < srcs.length) img.src = srcs[k]; else img.onerror = null; };
+  const sb = $("shbtn"); if (sb) { sb.classList.toggle("on", shiny); sb.setAttribute("aria-pressed", String(shiny)); }
   img.src = srcs[0]; img.style.imageRendering = pix ? "pixelated" : "auto";
   const d = descFor(g), el = $("desc");
   el.dataset.tr = d; el.textContent = d;
@@ -669,7 +767,7 @@ function shell() {
   const sel = `<select id="game" aria-label="Jogo">${gens.map(gn => `<optgroup label="${gn === "Outros" ? "Outros" : "Geração " + gn}">${curGames.filter(g => g.gen === gn).map(g => `<option value="${g.id}"${g.id === game ? " selected" : ""}>${esc(g.name)}</option>`).join("")}</optgroup>`).join("")}</select>`;
   const genus = m.sp ? ((m.sp.genera || []).find(x => x.language.name === "en") || {}).genus : "";
   return `<div class="card hd" id="hdr">
-  <div class="top"><img id="art" alt="${esc(pretty(m.name))}"><div class="hr"><h2>${esc(pretty(m.name))} <small class="mute">#${m.id}${genus ? " · " + esc(genus) : ""}</small></h2><div>${m.types.map(t => badge(t.type.name)).join("")}</div>${addBtn(m.name, false)}</div></div>
+  <div class="top"><div class="artw"><img id="art" alt="${esc(pretty(m.name))}"><button class="shbtn${shiny ? " on" : ""}" id="shbtn" data-shiny title="Alternar versão shiny" aria-pressed="${shiny}">✨</button></div><div class="hr"><h2>${esc(pretty(m.name))} <small class="mute">#${m.id}${genus ? " · " + esc(genus) : ""}</small></h2><div>${m.types.map(t => badge(t.type.name)).join("")}</div>${addBtn(m.name, false)}</div></div>
   <div class="mid"><div class="sts">${m.stats.map((s, i) => `<div class="s"><span>${NS[i]}</span><b>${s.base_stat}</b><div class="bar"><i style="width:${Math.min(100, s.base_stat / 1.6)}%"></i></div></div>`).join("")}</div>
   <div class="bubble"><p id="desc"></p></div></div>
   <div class="where"><div class="wh"><b>Onde encontrar</b>${sel}</div><div id="locs" class="locs"></div></div></div>
@@ -687,9 +785,9 @@ let sgen = "9", stier = null;
 const splitSlash = s => (s || "").split(" / ").filter(Boolean);
 
 function setsFor(raw, name) {
-  const keys = Object.keys(raw.data).filter(k => norm(k) === norm(name) || (k.startsWith(name + "-") && /^(Mega|Gmax|Primal)/.test(k.slice(name.length + 1)))).sort((a, b) => a.length - b.length);
+  const D = (raw && raw.data) || {}, keys = Object.keys(D).filter(k => norm(k) === norm(name) || (k.startsWith(name + "-") && /^(Mega|Gmax|Primal)/.test(k.slice(name.length + 1)))).sort((a, b) => a.length - b.length);
   const byTier = {};
-  keys.forEach(k => raw.data[k].forEach(g => (byTier[g.tier] = byTier[g.tier] || []).push({ form: k, sets: g.sets })));
+  keys.forEach(k => D[k].forEach(g => (byTier[g.tier] = byTier[g.tier] || []).push({ form: k, sets: g.sets })));
   return byTier;
 }
 
@@ -700,10 +798,11 @@ function nextImg(el) {
   if (!n) { el.onerror = null; el.src = NOICON; return; }
   el.dataset.fb = l.join("|"); el.src = n;
 }
-function itemImg(slug, o) {
-  if (!slug) return `<img src="${NOICON}" alt="" style="width:22px;height:22px">`;
+function itemImg(slug, o, sz) {
+  sz = sz || 22;
+  if (!slug) return `<img src="${NOICON}" alt="" style="width:${sz}px;height:${sz}px">`;
   const l = [o && o.sprites && o.sprites.default, ITEM_IMG(slug), `https://img.pokemondb.net/sprites/items/${slug}.png`].filter(Boolean);
-  return `<img src="${l[0]}" data-fb="${l.slice(1).join("|")}" alt="" onerror="nextImg(this)" style="width:22px;height:22px;image-rendering:pixelated">`;
+  return `<img src="${l[0]}" data-fb="${l.slice(1).join("|")}" alt="" onerror="nextImg(this)" style="width:${sz}px;height:${sz}px;image-rendering:pixelated">`;
 }
 
 // ---- Dica automática de "como usar", gerada a partir dos golpes, item, habilidade e Tera do set ----
@@ -845,6 +944,9 @@ document.addEventListener("click", e => {
   if (e.target.closest("[data-tan]")) { tanOpen = !tanOpen; renderTeam(); }
   if (e.target.closest("[data-tc]")) teamSuggest();
   if (e.target.closest("[data-tset]")) { tsetOpen = !tsetOpen; renderTeam(); }
+  const mm = e.target.closest("[data-mm]");
+  if (mm) { const [i, md] = mm.dataset.mm.split(":"), m = team[+i]; if (m) { m.mode = md; if (md === "free" && !m.free) m.free = freeFrom(m); saveTeam(); renderTeam(); } }
+  if (e.target.closest("[data-shiny]")) { shiny = !shiny; try { localStorage.setItem("pkshiny", shiny ? "1" : "0"); } catch (x) {} if (mon) renderGame(); }
   const tf = e.target.closest("[data-tf]");
   if (tf) { tfmt = tf.dataset.tf; fillSets(); }
   if (e.target.closest("[data-tcopy]")) { const t = exportTeam(); (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => tmsg("Time copiado!")).catch(() => { const x = $("texp"); if (x && x.select) { x.select(); tmsg("Selecione e copie (Ctrl+C)."); } }); }
@@ -859,6 +961,7 @@ document.addEventListener("click", e => {
 $("q").addEventListener("keydown", e => { if (e.key === "Enter") show($("q").value); });
 $("q").addEventListener("change", () => show($("q").value));
 
+document.addEventListener("toggle", e => { const b = e.target && e.target.dataset && e.target.dataset.tbox; if (b === "ex") exOpen = e.target.open; else if (b === "im") imOpen = e.target.open; }, true);
 renderTeam();
 j(`${POKEAPI}/pokemon?limit=1100`).then(d => { $("names").innerHTML = d.results.map(r => `<option value="${esc(pretty(r.name))}">`).join(""); }).catch(() => {});
 $("foot").innerHTML = '<b>Créditos</b><br>Estatísticas de uso, sets e estratégias: <a href="https://www.smogon.com" target="_blank" rel="noopener">Smogon</a> (<a href="https://www.smogon.com/stats/" target="_blank" rel="noopener">stats</a> e <a href="https://www.smogon.com/dex/" target="_blank" rel="noopener">Strategy Dex</a>), reunidos em formato aberto pelo projeto <a href="https://github.com/pkmn" target="_blank" rel="noopener">pkmn</a>. Sets do Random Battle e sprites animados: <a href="https://play.pokemonshowdown.com" target="_blank" rel="noopener">Pokémon Showdown</a>. Pokémon, golpes, itens, locais e imagens: <a href="https://pokeapi.co" target="_blank" rel="noopener">PokéAPI</a>. Tradução automática: <a href="https://mymemory.translated.net" target="_blank" rel="noopener">MyMemory</a>.<br>Projeto de fã, não oficial e sem vínculo com Nintendo, Game Freak, The Pokémon Company ou Smogon. Pokémon e seus nomes são marcas dos respectivos donos.';
