@@ -120,6 +120,14 @@ textarea{width:100%;font:inherit;font-size:.8rem;background:var(--card2);color:v
 .hint{grid-column:1/-1;margin:4px 0 0;font-size:.75rem}
 .errbar{background:#5b1f27;color:#ffd9dd;border:1px solid #ff5560;border-radius:10px;padding:8px 12px;margin:8px 0;font-size:.82rem;cursor:pointer}
 .errbar[hidden]{display:none}
+.tsel{font-weight:600;max-width:46%;min-width:0}
+.trow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 8px;border:1px solid var(--line);border-radius:10px;margin:0 0 6px;background:var(--card2)}
+.trow.cur{border-color:var(--acc)}
+.trow .grow{flex:1}
+.tname{background:none;border:0;color:var(--ink);font:600 .9rem "Poppins",system-ui,sans-serif;cursor:pointer;padding:0;text-align:left}
+.tsp img{width:26px;height:26px;image-rendering:pixelated}
+.trow .chip{margin:0;font-size:.75rem;padding:3px 10px}
+.linkbox{width:100%;margin-top:6px;font:inherit;font-size:.75rem;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--card2);color:var(--ink)}
 .chip{margin:0}
 .slots{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:6px}
 .slot{position:relative;border:1px solid var(--line);border-radius:10px;background:var(--card2);min-height:62px;display:flex;align-items:center;justify-content:center}
@@ -164,6 +172,7 @@ a{color:var(--acc)}
 <div id="team"></div>
 <div id="tanalysis"></div>
 <div id="tsets"></div>
+<div id="tmgr"></div>
 <div id="out"></div>
 <p class="mute" id="foot"></p>
 </main>
@@ -217,10 +226,19 @@ function translateAll(root, my) {
   root.querySelectorAll("[data-tr]").forEach(el => { const txt = el.dataset.tr; tr(txt).then(v => { if (renderTab.id === my && el.dataset.tr === txt) el.textContent = v; }); });
 }
 // ================= Montador de time (etapa 1) =================
-let team = (() => { try { return JSON.parse(localStorage.getItem("pkteam1") || "[]"); } catch (e) { return []; } })();
+const newId = () => "t" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+let teamsData = (() => {
+  try { const r = JSON.parse(localStorage.getItem("pkteams2")); if (r && Array.isArray(r.list) && r.list.length && r.list.every(t => t && Array.isArray(t.members))) return r; } catch (e) {}
+  let old = []; try { old = JSON.parse(localStorage.getItem("pkteam1") || "[]"); if (!Array.isArray(old)) old = []; } catch (e) {}
+  const id = newId();
+  return { cur: id, list: [{ id, name: "Time 1", fmt: "vgc", members: old }] };
+})();
+function curTeam() { return teamsData.list.find(t => t.id === teamsData.cur) || teamsData.list[0]; }
+let team = curTeam().members;
 let shiny = (() => { try { return localStorage.getItem("pkshiny") === "1"; } catch (e) { return false; } })();
-let tanOpen = false, tsetOpen = false, tfmt = "vgc";
-const saveTeam = () => { try { localStorage.setItem("pkteam1", JSON.stringify(team)); } catch (e) {} };
+let tanOpen = false, tsetOpen = false, tfmt = "vgc", tmgrOpen = false;
+tfmt = curTeam().fmt || "vgc";
+const saveTeam = () => { const c = curTeam(); c.members = team; c.fmt = tfmt; teamsData.cur = c.id; persistTeams(); };
 const inTeam = n => team.some(m => norm(m.name) === norm(n));
 const addLabel = (n, small) => inTeam(n) ? (small ? "✓" : "✓ No time") : (small ? "+" : "+ Time");
 const addBtn = (n, small) => `<button class="addbtn${small ? " sm" : ""}${inTeam(n) ? " on" : ""}" data-add="${esc(n)}" data-small="${small ? 1 : 0}" title="${inTeam(n) ? "Remover do time" : "Adicionar ao time"}">${addLabel(n, small)}</button>`;
@@ -250,8 +268,8 @@ function renderTeam() {
   const slots = Array.from({ length: 6 }, (_, i) => team[i]
     ? `<div class="slot"><button class="slotmon" data-n="${esc(team[i].name)}" title="Abrir ${esc(pretty(team[i].name))}${setLabel(team[i]) ? " · " + esc(setLabel(team[i])) : ""}"><img src="${team[i].sprite}" alt=""><span>${esc(pretty(team[i].name))}</span></button><button class="rm" data-rm="${i}" aria-label="Remover ${esc(pretty(team[i].name))}">×</button></div>`
     : '<div class="slot empty">+</div>').join("");
-  $("team").innerHTML = `<div class="card tbar"><div class="thead"><b>Meu time (${team.length}/6)</b><span id="tmsg" class="mute"></span><span class="grow"></span>${team.length ? `<button class="chip${tanOpen ? " on" : ""}" data-tan>Análise</button><button class="chip${tsetOpen ? " on" : ""}" data-tset>Sets e exportar</button><button class="chip" data-tclear>Limpar</button>` : '<span class="mute">Use o botão "+ Time" nos Pokémon</span>'}</div><div class="slots">${slots}</div></div>`;
-  fillAnalysis(); fillSets();
+  $("team").innerHTML = `<div class="card tbar"><div class="thead">${teamSelectHtml()}<b>${team.length}/6</b><span id="tmsg" class="mute"></span><span class="grow"></span><button class="chip${tmgrOpen ? " on" : ""}" data-tmgr>Times</button>${team.length ? `<button class="chip${tanOpen ? " on" : ""}" data-tan>Análise</button><button class="chip${tsetOpen ? " on" : ""}" data-tset>Sets e exportar</button><button class="chip" data-tclear>Limpar</button>` : '<span class="mute">Use o botão "+ Time" nos Pokémon</span>'}</div><div class="slots">${slots}</div></div>`;
+  fillAnalysis(); fillSets(); fillManager();
 }
 
 async function fillAnalysis() {
@@ -450,6 +468,8 @@ async function fillSets() {
   catch (e) { const box = $("tsets"); if (box) box.innerHTML = `<div class="card"><p class="mute" style="margin:0">Não consegui montar o painel de sets (${esc(e.message)}). <button class="chip" data-treset>Voltar ao modo normal</button></p></div>`; }
 }
 function teamChange(t) {
+  if (t.dataset.tsel !== undefined) { switchTeam(t.value); return; }
+  if (t.dataset.tfile !== undefined) { const f = t.files && t.files[0]; if (f) loadBackup(f).catch(x => showErr("Não consegui carregar o backup (" + x.message + ")")); t.value = ""; return; }
   if (t.dataset.ts !== undefined && t.dataset.ts !== "") {
     const i = +t.dataset.ts, m = team[i];
     if (!m || t.value === "") return;
@@ -469,6 +489,121 @@ function teamChange(t) {
     const [i, key] = t.dataset.tp.split(":"), m = team[+i];
     if (m && m.set) { m.set.pick = m.set.pick || {}; m.set.pick[key] = +t.value; saveTeam(); fillSets(); }
   }
+}
+
+// ================= Montador (etapa 3): vários times, link e backup =================
+function persistTeams() { try { localStorage.setItem("pkteams2", JSON.stringify(teamsData)); } catch (e) {} }
+function uniqueName(n) { const names = new Set(teamsData.list.map(t => t.name)); if (!names.has(n)) return n; let k = 2; while (names.has(`${n} (${k})`)) k++; return `${n} (${k})`; }
+const findTeam = id => teamsData.list.find(t => t.id === id);
+
+function switchTeam(id) {
+  saveTeam();
+  const c = findTeam(id); if (!c) return;
+  teamsData.cur = id; team = c.members; tfmt = c.fmt || "vgc"; persistTeams();
+  renderTeam(); refreshAddButtons();
+}
+function newTeam(name, members, fmt) {
+  saveTeam();
+  const t = { id: newId(), name: uniqueName((name || "Time " + (teamsData.list.length + 1)).slice(0, 40)), fmt: fmt || tfmt, members: members || [] };
+  teamsData.list.push(t); switchTeam(t.id); return t;
+}
+function renameTeam(id) {
+  const t = findTeam(id); if (!t) return;
+  const n = prompt("Novo nome do time:", t.name);
+  if (n && n.trim()) { t.name = n.trim().slice(0, 40); persistTeams(); renderTeam(); }
+}
+function duplicateTeam(id) { saveTeam(); const t = findTeam(id); if (t) newTeam(t.name + " (cópia)", JSON.parse(JSON.stringify(t.members)), t.fmt); }
+function deleteTeam(id) {
+  saveTeam();
+  const t = findTeam(id); if (!t || !confirm(`Excluir o time "${t.name}"?`)) return;
+  if (teamsData.list.length === 1) { t.members = []; team = t.members; saveTeam(); }
+  else {
+    teamsData.list = teamsData.list.filter(x => x.id !== id);
+    if (teamsData.cur === id) { teamsData.cur = teamsData.list[0].id; team = curTeam().members; tfmt = curTeam().fmt || "vgc"; }
+    persistTeams();
+  }
+  renderTeam(); refreshAddButtons();
+}
+const teamSelectHtml = () => `<select class="tsel" data-tsel aria-label="Time">${teamsData.list.map(t => `<option value="${t.id}"${t.id === teamsData.cur ? " selected" : ""}>${esc(t.name)}</option>`).join("")}</select>`;
+
+// ---- link compartilhável (o time inteiro vai dentro do endereço, comprimido) ----
+const toB64u = u8 => { let s = ""; for (let i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]); return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); };
+const fromB64u = s => { s = s.replace(/-/g, "+").replace(/_/g, "/"); while (s.length % 4) s += "="; const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; };
+async function packTeam(obj) {
+  const bytes = new TextEncoder().encode(JSON.stringify(obj));
+  if (typeof CompressionStream !== "undefined") {
+    const cs = new CompressionStream("deflate-raw"), w = cs.writable.getWriter(); w.write(bytes); w.close();
+    return "1." + toB64u(new Uint8Array(await new Response(cs.readable).arrayBuffer()));
+  }
+  return "0." + toB64u(bytes);
+}
+async function unpackTeam(str) {
+  let bytes = fromB64u(str.slice(2));
+  if (str[0] === "1") {
+    const ds = new DecompressionStream("deflate-raw"), w = ds.writable.getWriter(); w.write(bytes); w.close();
+    bytes = new Uint8Array(await new Response(ds.readable).arrayBuffer());
+  }
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+function slimMember(m) {
+  const s = memberSet(m), o = { p: m.id };
+  if (s) { const x = {}; const mv = (s.moves || []).filter(Boolean); if (mv.length) x.m = mv; if (s.item) x.i = s.item; if (s.ability) x.a = s.ability; if (s.nature) x.n = s.nature; if (s.tera) x.t = s.tera; if (s.evs) x.e = s.evs; if (s.ivs) x.v = s.ivs; if (Object.keys(x).length) o.s = x; }
+  return o;
+}
+async function buildLink() {
+  const c = curTeam();
+  return location.href.split("#")[0] + "#t=" + await packTeam({ v: 1, n: c.name, f: c.fmt || tfmt, m: team.map(slimMember) });
+}
+async function loadFromHash() {
+  if (typeof location === "undefined") return;
+  const h = (location.hash || "").match(/^#t=(.+)$/); if (!h) return;
+  try {
+    const obj = await unpackTeam(h[1]);
+    if (!obj || !Array.isArray(obj.m)) throw new Error("link inválido");
+    const members = [];
+    for (const x of obj.m.slice(0, 6)) {
+      let p = null; try { p = await j(`${POKEAPI}/pokemon/${+x.p}`); } catch (e) {}
+      if (!p) continue;
+      const s = x.s, set = s ? { label: "Compartilhado", raw: { moves: s.m || [], item: s.i || "", ability: s.a || "", nature: s.n || "", tera: s.t || "", evs: s.e || "", ivs: s.v || "" }, pick: {} } : null;
+      members.push({ name: p.name, id: p.id, types: p.types.map(t => t.type.name), sprite: p.sprites.front_default || "", set });
+    }
+    if (!members.length) throw new Error("nenhum Pokémon encontrado");
+    newTeam(`${String(obj.n || "Time").slice(0, 28)} (compartilhado)`, members, TFMT[obj.f] ? obj.f : "vgc");
+    tmgrOpen = false; renderTeam(); tmsg("Time compartilhado adicionado!");
+    try { history.replaceState(null, "", location.href.split("#")[0]); } catch (e) {}
+  } catch (e) { showErr("Não consegui abrir o time compartilhado (" + e.message + ")"); }
+}
+
+// ---- backup ----
+function downloadBackup() {
+  saveTeam();
+  const blob = new Blob([JSON.stringify({ app: "pokedesk", v: 2, teams: teamsData.list }, null, 1)], { type: "application/json" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "pokedesk-times.json";
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+async function loadBackup(file) {
+  const d = JSON.parse(await file.text()), list = d && (Array.isArray(d.teams) ? d.teams : Array.isArray(d) ? d : null);
+  if (!list) throw new Error("arquivo inválido");
+  let n = 0;
+  list.forEach(t => {
+    const ms = t && Array.isArray(t.members) ? t.members.filter(m => m && typeof m.name === "string" && Array.isArray(m.types)).slice(0, 6) : null;
+    if (ms) { teamsData.list.push({ id: newId(), name: uniqueName(String(t.name || "Time importado").slice(0, 40)), fmt: TFMT[t.fmt] ? t.fmt : "vgc", members: ms }); n++; }
+  });
+  if (!n) throw new Error("nenhum time encontrado no arquivo");
+  persistTeams(); renderTeam(); tmsg(n + " time(s) carregado(s).");
+}
+
+// ---- painel "Times" ----
+function fillManager() {
+  const box = $("tmgr"); if (!box) return;
+  if (!tmgrOpen) { box.innerHTML = ""; return; }
+  const rows = teamsData.list.map(t => `<div class="trow${t.id === teamsData.cur ? " cur" : ""}"><button class="tname" data-tsw="${t.id}" title="Abrir este time">${esc(t.name)}</button><span class="mute">${t.members.length}/6 · ${esc((TFMT[t.fmt] || TFMT.vgc).label)}</span><span class="tsp">${t.members.map(m => `<img src="${esc(m.sprite)}" alt="" title="${esc(pretty(m.name))}">`).join("")}</span><span class="grow"></span><button class="chip" data-tren="${t.id}">Renomear</button><button class="chip" data-tdup="${t.id}">Duplicar</button><button class="chip" data-tdel="${t.id}">Excluir</button></div>`).join("");
+  box.innerHTML = `<div class="card"><h3>Meus times</h3>${rows}<button class="chip" data-tnew>+ Novo time</button>
+    <h3 style="margin-top:14px">Compartilhar</h3><p class="mute" style="margin:0 0 6px">Gera um link com o time atual (Pokémon e sets escolhidos). Quem abrir recebe uma cópia, sem mexer nos times dele.</p>
+    <button class="chip" data-tlink>Copiar link do time atual</button> <span id="tlinkinfo" class="mute"></span>
+    <input id="tlinkbox" class="linkbox" readonly placeholder="O link aparece aqui">
+    <h3 style="margin-top:14px">Backup</h3><p class="mute" style="margin:0 0 6px">Os times ficam salvos só neste navegador. Baixe um arquivo para guardar ou levar para outro aparelho.</p>
+    <button class="chip" data-tbak>Baixar backup</button> <label class="chip">Carregar backup<input type="file" accept=".json,application/json" data-tfile hidden></label></div>`;
 }
 
 let game = "", mon = null, mode = "comp", cfmt = "vgc";
@@ -954,6 +1089,15 @@ document.addEventListener("click", e => {
   if (e.target.closest("[data-tan]")) { tanOpen = !tanOpen; renderTeam(); }
   if (e.target.closest("[data-tc]")) teamSuggest();
   if (e.target.closest("[data-tset]")) { tsetOpen = !tsetOpen; renderTeam(); }
+  if (e.target.closest("[data-tmgr]")) { tmgrOpen = !tmgrOpen; renderTeam(); }
+  const tsw = e.target.closest("[data-tsw]"), tre = e.target.closest("[data-tren]"), tdu = e.target.closest("[data-tdup]"), tde = e.target.closest("[data-tdel]");
+  if (tsw) switchTeam(tsw.dataset.tsw);
+  if (tre) renameTeam(tre.dataset.tren);
+  if (tdu) duplicateTeam(tdu.dataset.tdup);
+  if (tde) deleteTeam(tde.dataset.tdel);
+  if (e.target.closest("[data-tnew]")) newTeam();
+  if (e.target.closest("[data-tbak]")) downloadBackup();
+  if (e.target.closest("[data-tlink]")) buildLink().then(l => { const b = $("tlinkbox"), i = $("tlinkinfo"); if (b) b.value = l; if (i) i.textContent = l.length + " caracteres" + (l.length > 1800 ? " (longo: alguns apps podem cortar; use o texto do Showdown como alternativa)" : ""); (navigator.clipboard ? navigator.clipboard.writeText(l) : Promise.reject()).then(() => tmsg("Link copiado!")).catch(() => { if (b && b.select) { b.select(); tmsg("Selecione e copie o link (Ctrl+C)."); } }); }).catch(x => showErr("Não consegui gerar o link (" + x.message + ")"));
   if (e.target.closest("[data-treset]")) { team.forEach(m => { m.mode = "smogon"; }); saveTeam(); renderTeam(); }
   const mm = e.target.closest("[data-mm]");
   if (mm) { const [i, md] = mm.dataset.mm.split(":"), m = team[+i]; if (m) { if (md === "free" && !m.free) m.free = freeFrom(m); m.mode = md; saveTeam(); renderTeam(); } }
@@ -961,7 +1105,7 @@ document.addEventListener("click", e => {
   if (sy) { const [i, v] = sy.dataset.sys.split(":"), m = team[+i]; if (m && m.free) { m.free.sys = v; m.free.sysLock = true; if (v === "sp") EVK.forEach(([k]) => { m.free.ev[k] = Math.min(32, m.free.ev[k] || 0); }); saveTeam(); fillSets(); } }
   if (e.target.closest("[data-shiny]")) { shiny = !shiny; try { localStorage.setItem("pkshiny", shiny ? "1" : "0"); } catch (x) {} if (mon) renderGame(); }
   const tf = e.target.closest("[data-tf]");
-  if (tf) { tfmt = tf.dataset.tf; fillSets(); }
+  if (tf) { tfmt = tf.dataset.tf; saveTeam(); fillSets(); }
   if (e.target.closest("[data-tcopy]")) { const t = exportTeam(); (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => tmsg("Time copiado!")).catch(() => { const x = $("texp"); if (x && x.select) { x.select(); tmsg("Selecione e copie (Ctrl+C)."); } }); }
   if (e.target.closest("[data-timp]")) importTeam($("timp").value);
   const cf = e.target.closest("[data-cf]");
@@ -983,9 +1127,10 @@ if (typeof window !== "undefined" && window.addEventListener) {
   const eb = $("errbar"); if (eb) eb.addEventListener("click", () => { eb.hidden = true; });
 }
 renderTeam();
+loadFromHash();
+if (typeof window !== "undefined") window.addEventListener("hashchange", loadFromHash);
 j(`${POKEAPI}/pokemon?limit=1100`).then(d => { $("names").innerHTML = d.results.map(r => `<option value="${esc(pretty(r.name))}">`).join(""); }).catch(() => {});
-$("foot").innerHTML = '<b>Créditos</b><br>Estatísticas de uso, sets e estratégias: <a href="https://www.smogon.com" target="_blank" rel="noopener">Smogon</a> (<a href="https://www.smogon.com/stats/" target="_blank" rel="noopener">stats</a> e <a href="https://www.smogon.com/dex/" target="_blank" rel="noopener">Strategy Dex</a>), reunidos em formato aberto pelo projeto <a href="https://github.com/pkmn" target="_blank" rel="noopener">pkmn</a>. Sets do Random Battle e sprites animados: <a href="https://play.pokemonshowdown.com" target="_blank" rel="noopener">Pokémon Showdown</a>. Pokémon, golpes, itens, locais e imagens: <a href="https://pokeapi.co" target="_blank" rel="noopener">PokéAPI</a>. Tradução automática: <a href="https://mymemory.translated.net" target="_blank" rel="noopener">MyMemory</a>.<br>Projeto de fã, não oficial e sem vínculo com Nintendo, Game Freak, The Pokémon Company ou Smogon. Pokémon e seus nomes são marcas dos respectivos donos.';
+$("foot").innerHTML = '<b>Créditos</b> <span id="ver">· versão: etapa 3 (vários times, link e backup)</span><br>Estatísticas de uso, sets e estratégias: <a href="https://www.smogon.com" target="_blank" rel="noopener">Smogon</a> (<a href="https://www.smogon.com/stats/" target="_blank" rel="noopener">stats</a> e <a href="https://www.smogon.com/dex/" target="_blank" rel="noopener">Strategy Dex</a>), reunidos em formato aberto pelo projeto <a href="https://github.com/pkmn" target="_blank" rel="noopener">pkmn</a>. Sets do Random Battle e sprites animados: <a href="https://play.pokemonshowdown.com" target="_blank" rel="noopener">Pokémon Showdown</a>. Pokémon, golpes, itens, locais e imagens: <a href="https://pokeapi.co" target="_blank" rel="noopener">PokéAPI</a>. Tradução automática: <a href="https://mymemory.translated.net" target="_blank" rel="noopener">MyMemory</a>.<br>Projeto de fã, não oficial e sem vínculo com Nintendo, Game Freak, The Pokémon Company ou Smogon. Pokémon e seus nomes são marcas dos respectivos donos.';
 </script>
 </body>
 </html>
-
