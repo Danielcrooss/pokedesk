@@ -1,6 +1,6 @@
 (function () {
   "use strict";
-  const VERSION = "4.0";
+  const VERSION = "4.1";
   // Links de time compartilhados antes da divisão em páginas apontavam para o início: levar ao Competitivo.
   if (location.hash.indexOf("#t=") === 0) { location.replace("competitivo.html" + location.hash); return; }
 
@@ -16,15 +16,16 @@
   const showErr = m => { const b = $("errbar"); if (b && m) { b.hidden = false; b.textContent = "Ops, algo deu errado: " + m + " (clique para fechar)."; b.onclick = () => { b.hidden = true; }; } };
   window.addEventListener("error", e => showErr(e.message));
   window.addEventListener("unhandledrejection", e => showErr((e.reason && e.reason.message) || String(e.reason)));
+  if (window.PokeSearch && PokeSearch.version !== VERSION) showErr("O arquivo busca.js está em outra versão. Envie todos os arquivos juntos e aperte Ctrl+F5.");
   if (document.body.dataset.v && document.body.dataset.v !== VERSION) showErr("Os arquivos do site estão em versões diferentes. Envie todos os arquivos juntos e aperte Ctrl+F5.");
 
   // ---- busca ----
   let lastArea = "comp";
   try { const l = JSON.parse(localStorage.getItem("pklast")); if (l && AREA[l.area]) lastArea = l.area; } catch (e) {}
   const go = area => { const v = slug($("q").value); if (!v) { $("q").focus(); return; } location.href = AREA[area][0] + "?p=" + encodeURIComponent(v); };
-  $("q").addEventListener("keydown", e => { if (e.key === "Enter") go(lastArea); });
+  if (window.PokeSearch) PokeSearch.attach($("q"), { onSelect: n => { location.href = AREA[lastArea][0] + "?p=" + encodeURIComponent(n); }, onSubmit: () => go(lastArea) });
+  else { $("q").addEventListener("keydown", e => { if (e.key === "Enter") go(lastArea); }); showErr("O arquivo busca.js não foi enviado: a busca ficou simples."); }
   document.addEventListener("click", e => { const b = e.target.closest("[data-go]"); if (b) go(b.dataset.go); });
-  j(POKEAPI + "/pokemon?limit=1100").then(d => { $("names").innerHTML = d.results.map(r => '<option value="' + esc(pretty(r.name)) + '">').join(""); }).catch(() => {});
 
   // ---- continuar de onde parou ----
   (function resume() {
@@ -63,5 +64,5 @@
   document.addEventListener("click", e => { const b = e.target.closest("[data-top]"); if (b) top(b.dataset.top); });
   top(cur);
 
-  $("foot").innerHTML = '<b>Créditos</b> <span id="ver">· versão: etapa 4 (páginas separadas)</span><br>Estatísticas de uso, sets e estratégias: <a href="https://www.smogon.com" target="_blank" rel="noopener">Smogon</a> (<a href="https://www.smogon.com/stats/" target="_blank" rel="noopener">stats</a> e <a href="https://www.smogon.com/dex/" target="_blank" rel="noopener">Strategy Dex</a>), reunidos em formato aberto pelo projeto <a href="https://github.com/pkmn" target="_blank" rel="noopener">pkmn</a>. Sets do Random Battle e sprites animados: <a href="https://play.pokemonshowdown.com" target="_blank" rel="noopener">Pokémon Showdown</a>. Pokémon, golpes, itens, locais e imagens: <a href="https://pokeapi.co" target="_blank" rel="noopener">PokéAPI</a>. Tradução automática: <a href="https://mymemory.translated.net" target="_blank" rel="noopener">MyMemory</a>.<br>Projeto de fã, não oficial e sem vínculo com Nintendo, Game Freak, The Pokémon Company ou Smogon. Pokémon e seus nomes são marcas dos respectivos donos.';
+  $("foot").innerHTML = '<b>Créditos</b> <span id="ver">· versão: etapa 4.1 (nova busca)</span><br>Estatísticas de uso, sets e estratégias: <a href="https://www.smogon.com" target="_blank" rel="noopener">Smogon</a> (<a href="https://www.smogon.com/stats/" target="_blank" rel="noopener">stats</a> e <a href="https://www.smogon.com/dex/" target="_blank" rel="noopener">Strategy Dex</a>), reunidos em formato aberto pelo projeto <a href="https://github.com/pkmn" target="_blank" rel="noopener">pkmn</a>. Sets do Random Battle e sprites animados: <a href="https://play.pokemonshowdown.com" target="_blank" rel="noopener">Pokémon Showdown</a>. Pokémon, golpes, itens, locais e imagens: <a href="https://pokeapi.co" target="_blank" rel="noopener">PokéAPI</a>. Tradução automática: <a href="https://mymemory.translated.net" target="_blank" rel="noopener">MyMemory</a>.<br>Projeto de fã, não oficial e sem vínculo com Nintendo, Game Freak, The Pokémon Company ou Smogon. Pokémon e seus nomes são marcas dos respectivos donos.';
 })();

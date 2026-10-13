@@ -6,16 +6,15 @@
 <title>Pokédesk · builds, estratégias e times de Pokémon</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="estilo.css?v=4.0">
+<link rel="stylesheet" href="estilo.css?v=4.1">
 </head>
-<body data-page="home" data-v="4.0">
+<body data-page="home" data-v="4.1">
 <main>
-<nav class="sitenav"><a class="brand on" href="index.html">Pokédesk</a><a class="on" href="index.html">Início</a><a href="competitivo.html">Competitivo</a><a href="casual.html">Casual</a></nav>
+<nav class="sitenav"><a class="brand" href="index.html">Pokédesk</a><a class="on" href="index.html">Início</a><a href="competitivo.html">Competitivo</a><a href="casual.html">Casual</a></nav>
 <h1>Pokédesk</h1>
 <p class="sub">Builds, estratégias e times de Pokémon: do competitivo à aventura.</p>
 <div class="hsearch">
-<input id="q" list="names" placeholder="Buscar um Pokémon (ex.: Garchomp)" aria-label="Nome do Pokémon" autocomplete="off">
-<datalist id="names"></datalist>
+<input id="q" placeholder="Buscar um Pokémon (ex.: Garchomp)" aria-label="Nome do Pokémon" autocomplete="off">
 <div class="gnav" style="margin-top:8px"><span class="mute">Abrir em:</span><button class="chip" data-go="comp">Competitivo</button><button class="chip" data-go="casual">Casual</button></div>
 </div>
 <div id="errbar" class="errbar" hidden></div>
@@ -27,6 +26,7 @@
 <div class="card"><h3>Mais usados do mês</h3><div class="gnav" id="topnav"></div><div id="top10"></div><p class="mute" id="topinfo" style="margin:8px 0 0"></p></div>
 <p class="mute" id="foot"></p>
 </main>
-<script src="home.js?v=4.0"></script>
+<script src="busca.js?v=4.1"></script>
+<script src="home.js?v=4.1"></script>
 </body>
 </html>
