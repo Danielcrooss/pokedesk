@@ -200,3 +200,8 @@ body[data-page="comp"] .where{display:none}
 .slink{background:none;border:0;color:var(--acc);font:inherit;font-size:.75rem;cursor:pointer;padding:0;text-transform:none;letter-spacing:0}
 .snone{padding:16px 14px;color:var(--mute);font-size:.88rem;line-height:1.5;text-align:center}
 @media(max-width:560px){.sitem .stp .tp{display:none}.sitem .stp .tp:first-child{display:inline-block}}
+
+/* ---- macho / fêmea ---- */
+.gtog{margin:6px 0 0}
+.gtog .chip{margin:0 6px 0 0}
+.gtog .mute{font-size:.75rem;margin-top:4px;line-height:1.4}

@@ -1,7 +1,7 @@
 /* Busca de Pokémon (compartilhada pelas três páginas). Uso: PokeSearch.attach(input, { onSelect(nome), onSubmit(texto) }) */
 (function () {
   "use strict";
-  const VERSION = "4.1";
+  const VERSION = "4.2";
   const POKEAPI = "https://pokeapi.co/api/v2";
   const SPR = id => "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/" + id + ".png";
   const TC = { normal: "#9fa19f", fire: "#e8622a", water: "#4592e6", electric: "#e8b800", grass: "#3fa129", ice: "#3dcef3", fighting: "#d3425f", poison: "#9f5bd0", ground: "#a97a4a", flying: "#7fa4e8", psychic: "#ee6b7a", bug: "#8fa31b", rock: "#b8a86e", ghost: "#6c5aa8", dragon: "#4f60e2", dark: "#5b5466", steel: "#5a8ea5", fairy: "#ee90e6" };
@@ -13,7 +13,17 @@
   // ---- lista de nomes (guardada no navegador por 7 dias) ----
   const KEY = "pknames1";
   let all = [], listeners = [];
-  const build = list => list.map(([n, id]) => ({ n, id, p: pretty(n), k: norm(n), w: n.split("-").map(norm) }));
+  const mk = (n, id, base, merged) => ({ n, id, p: pretty(base), k: norm(base), w: base.split("-").map(norm), merged });
+  // Macho e fêmea separados na PokéAPI (Indeedee, Basculegion...) viram um resultado só; a página mostra os dois.
+  const build = list => {
+    const names = new Set(list.map(x => x[0])), out = [];
+    list.forEach(([n, id]) => {
+      const m = n.match(/^(.*)-(male|female)$/);
+      if (m && names.has(m[1] + "-male") && names.has(m[1] + "-female")) { if (m[2] === "male") out.push(mk(n, id, m[1], true)); }
+      else out.push(mk(n, id, n, false));
+    });
+    return out;
+  };
   (function load() {
     let cached = null; try { cached = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
     if (cached && Array.isArray(cached.list) && cached.list.length) all = build(cached.list);
@@ -41,10 +51,16 @@
     return out.sort((a, b) => b[0] - a[0]).slice(0, 8).map(x => x[1]);
   }
 
-  const types = {};
-  function loadTypes(it, cb) {
-    if (types[it.id]) return cb(types[it.id]);
-    fetch(POKEAPI + "/pokemon/" + it.id).then(r => r.json()).then(p => { types[it.id] = p.types.map(t => t.type.name); cb(types[it.id]); }).catch(() => {});
+  const ART = id => "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/" + id + ".png";
+  // Se a imagem padrão não existir, tenta a arte oficial e depois a imagem que a própria PokéAPI informa.
+  window.__pkImgFail = img => { const st = +img.dataset.st || 0; img.dataset.st = st + 1; if (st === 0) img.src = ART(img.dataset.id); else if (st === 1 && img.dataset.api) img.src = img.dataset.api; else img.style.visibility = "hidden"; };
+  const meta = {};
+  function loadMeta(it, cb) {
+    if (meta[it.id]) return cb(meta[it.id]);
+    fetch(POKEAPI + "/pokemon/" + it.id).then(r => r.json()).then(p => {
+      meta[it.id] = { types: p.types.map(t => t.type.name), sprite: (p.sprites && p.sprites.front_default) || (((p.sprites || {}).other || {})["official-artwork"] || {}).front_default || "" };
+      cb(meta[it.id]);
+    }).catch(() => {});
   }
   const badges = ts => ts.map(t => '<span class="tp mini" style="background:' + (TC[t] || "#667") + '">' + pretty(t) + "</span>").join("");
 
@@ -78,7 +94,7 @@
     function row(it, q, i) {
       const idx = q ? it.p.toLowerCase().indexOf(q.toLowerCase()) : -1;
       const name = idx >= 0 ? esc(it.p.slice(0, idx)) + "<b>" + esc(it.p.slice(idx, idx + q.length)) + "</b>" + esc(it.p.slice(idx + q.length)) : esc(it.p);
-      return '<div class="sitem" role="option" id="so-' + list.id + "-" + i + '" data-i="' + i + '" aria-selected="false"><img src="' + SPR(it.id) + '" alt="" loading="lazy" onerror="this.style.visibility=\'hidden\'"><div class="sn"><span>' + name + "</span><small>" + (it.id && it.id <= 1025 ? "#" + String(it.id).padStart(4, "0") : "forma alternativa") + '</small></div><span class="stp"></span></div>';
+      return '<div class="sitem" role="option" id="so-' + list.id + "-" + i + '" data-i="' + i + '" aria-selected="false"><img src="' + SPR(it.id) + '" data-id="' + it.id + '" alt="" loading="lazy" onerror="__pkImgFail(this)"><div class="sn"><span>' + name + "</span><small>" + ((it.id && it.id <= 1025 ? "#" + String(it.id).padStart(4, "0") : "forma alternativa") + (it.merged ? " · ♂ ♀" : "")) + '</small></div><span class="stp"></span></div>';
     }
     function render() {
       const q = input.value.trim(); clear.hidden = !input.value; kbd.hidden = !!input.value;
@@ -95,7 +111,10 @@
       }
       list.innerHTML = html; list.hidden = false; input.setAttribute("aria-expanded", "true");
       active = items.length && q ? 0 : -1; setActive(active);
-      list.querySelectorAll(".sitem").forEach((el, i) => loadTypes(items[i], ts => { const t = el.querySelector(".stp"); if (t) t.innerHTML = badges(ts); }));
+      list.querySelectorAll(".sitem").forEach((el, i) => loadMeta(items[i], mt => {
+        const t = el.querySelector(".stp"); if (t) t.innerHTML = badges(mt.types);
+        const im = el.querySelector("img"); if (im && mt.sprite) { im.dataset.api = mt.sprite; if ((+im.dataset.st || 0) >= 2) { im.style.visibility = ""; im.src = mt.sprite; } }
+      }));
     }
     listeners.push(() => { if (document.activeElement === input) render(); });
 

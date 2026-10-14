@@ -5,7 +5,7 @@ const GAME = "scarlet-violet";
 
 const NS = ["PS","Atq","Def","SpA","SpD","Vel"];
 const TC = {normal:"#9fa19f",fire:"#e8622a",water:"#4592e6",electric:"#e8b800",grass:"#3fa129",ice:"#3dcef3",fighting:"#d3425f",poison:"#9f5bd0",ground:"#a97a4a",flying:"#7fa4e8",psychic:"#ee6b7a",bug:"#8fa31b",rock:"#b8a86e",ghost:"#6c5aa8",dragon:"#4f60e2",dark:"#5b5466",steel:"#5a8ea5",fairy:"#ee90e6"};
-const APP_VERSION = "4.1";
+const APP_VERSION = "4.2";
 const PAGE = (typeof document !== "undefined" && document.body && document.body.dataset && document.body.dataset.page) || "comp";
 const KIND = PAGE === "casual" ? "aventura" : "comp";
 const MODES = PAGE === "casual" ? [["casual", "Casual"]] : [["comp", "Competitivo"], ["strat", "Outras gerações"]];
@@ -28,7 +28,14 @@ const enName = (o, fb) => ((o.names || []).find(n => n.language.name === "en") |
 const idx = {};
 const index = kind => idx[kind] || (idx[kind] = j(`${POKEAPI}/${kind}?limit=3000`).then(d => Object.fromEntries(d.results.map(r => [norm(r.name), r.name]))).catch(() => { delete idx[kind]; return {}; }));
 
-const sprite = async name => { const sl = slug(name); for (const id of [sl, sl.split("-")[0]]) { try { return (await j(`${POKEAPI}/pokemon/${id}`)).sprites.front_default || ""; } catch (e) {} } return ""; };
+// ---- Pokémon com macho e fêmea separados na PokéAPI (Indeedee, Basculegion, Meowstic, Oinkologne) ----
+const genderOf = n => { const m = String(n).toLowerCase().match(/^(.*)-(male|female)$/); return m ? { base: m[1], g: m[2] } : null; };
+const disp = n => { const g = genderOf(n); return pretty(g ? g.base : n); };
+const tdisp = n => { const g = genderOf(n); return pretty(g ? g.base : n) + (g ? (g.g === "female" ? " ♀" : " ♂") : ""); };
+const dn = n => { const g = genderOf(n); return g ? pretty(g.base) + (g.g === "female" ? "-F" : "") : pretty(n); };
+function monCands(raw) { const s = slug(raw), f = s.split("-")[0], c = [s]; if (/-f$/.test(s)) c.push(s.replace(/-f$/, "-female")); if (/-m$/.test(s)) c.push(s.replace(/-m$/, "-male")); c.push(s + "-male", f + "-male", f); return [...new Set(c)]; }
+async function fetchMon(raw) { for (const id of monCands(raw)) { try { const p = await j(`${POKEAPI}/pokemon/${id}`); if (p && p.sprites && p.types) return p; } catch (e) {} } return null; }
+const sprite = async name => { const p = await fetchMon(name).catch(() => null); return (p && p.sprites && p.sprites.front_default) || ""; };
 const ROLE_PT = { "Fast Attacker": "Atacante rápido", "Setup Sweeper": "Atacante com setup", "Wallbreaker": "Quebra-defesas", "Bulky Attacker": "Atacante resistente", "Bulky Setup": "Setup resistente", "Fast Support": "Suporte rápido", "Bulky Support": "Suporte resistente", "Staller": "Desgaste", "Tera Blast user": "Usuário de Tera Blast", "Offensive Protect": "Protect ofensivo", "Choice Item user": "Usuário de item Choice", "AV Pivot": "Pivô com Assault Vest", "Spinner": "Removedor de hazards", "Doubles Fast Attacker": "Atacante rápido (Doubles)", "Doubles Setup Sweeper": "Atacante com setup (Doubles)", "Doubles Wallbreaker": "Quebra-defesas (Doubles)", "Doubles Bulky Attacker": "Atacante resistente (Doubles)", "Doubles Bulky Setup": "Setup resistente (Doubles)", "Doubles Support": "Suporte (Doubles)", "Baton Pass user": "Usuário de Baton Pass", "Berry Sweeper": "Atacante com berry" };
 const trCache = (() => { try { return JSON.parse(localStorage.getItem("trpt1") || "{}"); } catch (e) { return {}; } })();
 const decode = s => { const e = document.createElement("textarea"); e.innerHTML = s; return e.value; };
@@ -63,7 +70,7 @@ let shiny = (() => { try { return localStorage.getItem("pkshiny") === "1"; } cat
 let tanOpen = false, tsetOpen = false, tfmt = "vgc", tmgrOpen = false;
 tfmt = curTeam().fmt || "vgc";
 const saveTeam = () => { const c = curTeam(); c.members = team; c.fmt = tfmt; teamsData.cur = c.id; (teamsData.last = teamsData.last || {})[c.kind || "comp"] = c.id; persistTeams(); };
-const inTeam = n => team.some(m => norm(m.name) === norm(n));
+const inTeam = n => team.some(m => norm(dn(m.name)) === norm(dn(n)));
 const addLabel = (n, small) => inTeam(n) ? (small ? "✓" : "✓ No time") : (small ? "+" : "+ Time");
 const addBtn = (n, small) => `<button class="addbtn${small ? " sm" : ""}${inTeam(n) ? " on" : ""}" data-add="${esc(n)}" data-small="${small ? 1 : 0}" title="${inTeam(n) ? "Remover do time" : "Adicionar ao time"}">${addLabel(n, small)}</button>`;
 function refreshAddButtons() {
@@ -78,19 +85,18 @@ const weakTypes = TD => Object.keys(TC).filter(t => { const ms = team.map(m => m
 
 async function addToTeam(raw) {
   if (team.length >= 6) { tmsg("O time já tem 6 Pokémon."); return; }
-  const sl = slug(raw); let p = null;
-  for (const id of [sl, sl.split("-")[0]]) { try { p = await j(`${POKEAPI}/pokemon/${id}`); break; } catch (e) {} }
+  const p = await fetchMon(raw);
   if (!p) { tmsg("Não consegui adicionar " + raw + "."); return; }
   if (team.some(m => m.id === p.id)) return;
   team.push({ name: p.name, id: p.id, types: p.types.map(t => t.type.name), sprite: p.sprites.front_default || "" });
   saveTeam(); renderTeam(); refreshAddButtons();
 }
 function removeFromTeam(i) { team.splice(i, 1); saveTeam(); renderTeam(); refreshAddButtons(); }
-function toggleTeam(n) { const i = team.findIndex(m => norm(m.name) === norm(n)); if (i >= 0) removeFromTeam(i); else addToTeam(n); }
+function toggleTeam(n) { const i = team.findIndex(m => norm(dn(m.name)) === norm(dn(n))); if (i >= 0) removeFromTeam(i); else addToTeam(n); }
 
 function renderTeam() {
   const slots = Array.from({ length: 6 }, (_, i) => team[i]
-    ? `<div class="slot"><button class="slotmon" data-n="${esc(team[i].name)}" title="Abrir ${esc(pretty(team[i].name))}${setLabel(team[i]) ? " · " + esc(setLabel(team[i])) : ""}"><img src="${team[i].sprite}" alt=""><span>${esc(pretty(team[i].name))}</span></button><button class="rm" data-rm="${i}" aria-label="Remover ${esc(pretty(team[i].name))}">×</button></div>`
+    ? `<div class="slot"><button class="slotmon" data-n="${esc(team[i].name)}" title="Abrir ${esc(tdisp(team[i].name))}${setLabel(team[i]) ? " · " + esc(setLabel(team[i])) : ""}"><img src="${team[i].sprite}" alt=""><span>${esc(tdisp(team[i].name))}</span></button><button class="rm" data-rm="${i}" aria-label="Remover ${esc(tdisp(team[i].name))}">×</button></div>`
     : '<div class="slot empty">+</div>').join("");
   $("team").innerHTML = `<div class="card tbar"><div class="thead">${teamSelectHtml()}<b>${team.length}/6</b><span id="tmsg" class="mute"></span><span class="grow"></span><button class="chip${tmgrOpen ? " on" : ""}" data-tmgr>Times</button>${team.length ? `<button class="chip${tanOpen ? " on" : ""}" data-tan>Análise</button>${KIND === "comp" ? `<button class="chip${tsetOpen ? " on" : ""}" data-tset>Sets e exportar</button>` : ""}<button class="chip" data-tclear>Limpar</button>` : '<span class="mute">Use o botão "+ Time" nos Pokémon</span>'}</div><div class="slots">${slots}</div></div>`;
   fillAnalysis(); fillSets(); fillManager();
@@ -107,7 +113,7 @@ async function fillAnalysis() {
     const ms = team.map(m => mulT(TD, m.types, t)), w = ms.filter(x => x > 1).length, r = ms.filter(x => x < 1).length;
     return `<tr class="${bad.includes(t) ? "bad" : ""}"><th>${badge(t)}</th>${ms.map(x => x === 1 ? "<td></td>" : `<td class="${cl[x]}">${fm[x]}</td>`).join("")}<td>${w || ""}</td><td>${r || ""}</td></tr>`;
   }).join("");
-  const head = `<tr><th></th>${team.map(m => `<th><img src="${m.sprite}" alt="${esc(pretty(m.name))}" title="${esc(pretty(m.name))}"></th>`).join("")}<th title="Pokémon fracos a esse tipo">Fr.</th><th title="Pokémon que resistem">Res.</th></tr>`;
+  const head = `<tr><th></th>${team.map(m => `<th><img src="${m.sprite}" alt="${esc(tdisp(m.name))}" title="${esc(tdisp(m.name))}"></th>`).join("")}<th title="Pokémon fracos a esse tipo">Fr.</th><th title="Pokémon que resistem">Res.</th></tr>`;
   const summary = bad.length ? `Atenção: mais Pokémon do time são fracos do que resistem a ${bad.map(t => pretty(t)).join(", ")}.` : "Nenhum tipo tem mais Pokémon fracos do que resistentes. Bom equilíbrio!";
   box.innerHTML = `<div class="card"><h3>Análise do time</h3><div style="overflow-x:auto"><table class="ttab">${head}${rows}</table></div><p class="mute" style="margin:8px 0">${esc(summary)}</p><button class="chip" data-tc>Sugerir Pokémon que cobrem</button><div id="tcover" style="margin-top:8px"></div></div>`;
 }
@@ -140,7 +146,7 @@ function resolveSet(set) {
 const toSD = s => (s || "").replace(/\bPS\b/g, "HP").replace(/\bAtq\b/g, "Atk").replace(/\bVel\b/g, "Spe");
 function exportTeam() {
   return team.map(m => {
-    const s = memberSet(m), L = [pretty(m.name) + (s && s.item ? " @ " + s.item : "")];
+    const s = memberSet(m), L = [dn(m.name) + (s && s.item ? " @ " + s.item : "")];
     if (s) {
       if (s.ability) L.push("Ability: " + s.ability);
       if (s.tera) L.push("Tera Type: " + s.tera);
@@ -171,8 +177,7 @@ async function importTeam(text) {
   const parsed = parseShowdown(text), out = [];
   if (!parsed.length) { tmsg("Nada para importar."); return; }
   for (const { species, set } of parsed) {
-    const sl = slug(species); let p = null;
-    for (const id of [sl, sl.split("-")[0]]) { try { p = await j(`${POKEAPI}/pokemon/${id}`); break; } catch (e) {} }
+    const p = await fetchMon(species);
     if (!p) { tmsg("Não achei " + species + "."); continue; }
     out.push({ name: p.name, id: p.id, types: p.types.map(t => t.type.name), sprite: p.sprites.front_default || "", set: set.moves.length || set.item ? { label: "Importado", raw: set, pick: {} } : null });
   }
@@ -266,7 +271,7 @@ async function fillSetsInner() {
   };
   const rows = team.map((m, i) => {
     const free = m.mode === "free";
-    const byTier = raw ? setsFor(raw, pretty(m.name)) : {}, tiers = Object.keys(byTier).filter(cfg.keep).sort((a, b) => tierRank(a) - tierRank(b));
+    const byTier = raw ? setsFor(raw, dn(m.name)) : {}, tiers = Object.keys(byTier).filter(cfg.keep).sort((a, b) => tierRank(a) - tierRank(b));
     const opts = tiers.map(t => `<optgroup label="${esc(tierName(t))}">${byTier[t][0].sets.map((s, si) => `<option value="${t}|${si}">${esc(s.name)}</option>`).join("")}</optgroup>`).join("");
     const sel = free ? "" : `<select data-ts="${i}"><option value="">${m.set ? "Atual: " + esc(m.set.label) : tiers.length ? "Escolher set…" : "Sem sets neste formato"}</option>${opts}${m.set ? '<option value="__none">Remover set</option>' : ""}</select>`;
     const chips = `<div class="gnav" style="margin:6px 0 0"><button class="chip${free ? "" : " on"}" data-mm="${i}:smogon">Sets do formato</button><button class="chip${free ? " on" : ""}" data-mm="${i}:free">Set livre</button></div>`;
@@ -276,7 +281,7 @@ async function fillSetsInner() {
       const r = m.set.raw, p = m.set.pick || {};
       det = `<div class="smf">${field(i, "item", "Item", r.item, p.item || 0)}${field(i, "ab", "Habilidade", r.ability, p.ab || 0)}${field(i, "nat", "Natureza", r.nature, p.nat || 0)}${field(i, "tera", "Tera", r.tera, p.tera || 0)}${evField(i, r, p)}${(r.moves || []).map((mv, k) => field(i, "m" + k, "Golpe " + (k + 1), mv, p["m" + k] || 0)).join("")}</div>`;
     }
-    return `<div class="smem"><div class="smh"><img src="${esc(m.sprite)}" alt=""><b>${esc(pretty(m.name))}</b>${sel}</div>${chips}${det}</div>`;
+    return `<div class="smem"><div class="smh"><img src="${esc(m.sprite)}" alt=""><b>${esc(tdisp(m.name))}</b>${sel}</div>${chips}${det}</div>`;
   }).join("");
   const itemList = anyFree ? `<datalist id="dl-item">${Object.values(ii).map(s => `<option value="${esc(pretty(s))}">`).join("")}</datalist>` : "";
   box.innerHTML = `<div class="card"><h3>Sets e exportação</h3>${tnav}${raw ? "" : '<p class="mute">Ainda não há dados de sets. Rode o workflow no GitHub.</p>'}${rows}${itemList}
@@ -301,7 +306,7 @@ function teamChange(t) {
     else {
       const [tier, si] = t.value.split("|"), cfg = TFMT[tfmt];
       j(`data/strategies/${cfg.gen}.json`).then(raw => {
-        const b = setsFor(raw, pretty(m.name))[tier], s = b && b[0].sets[+si];
+        const b = setsFor(raw, dn(m.name))[tier], s = b && b[0].sets[+si];
         if (s) { m.set = { label: tierName(tier) + " · " + s.name, raw: s, pick: {} }; saveTeam(); renderTeam(); }
       }).catch(() => {});
       return;
@@ -432,7 +437,7 @@ async function loadBackup(file) {
 function fillManager() {
   const box = $("tmgr"); if (!box) return;
   if (!tmgrOpen) { box.innerHTML = ""; return; }
-  const rows = teamsData.list.filter(t => (t.kind || "comp") === KIND).map(t => `<div class="trow${t.id === teamsData.cur ? " cur" : ""}"><button class="tname" data-tsw="${t.id}" title="Abrir este time">${esc(t.name)}</button><span class="mute">${t.members.length}/6 · ${esc(KIND === "aventura" ? "Aventura" : (TFMT[t.fmt] || TFMT.vgc).label)}</span><span class="tsp">${t.members.map(m => `<img src="${esc(m.sprite)}" alt="" title="${esc(pretty(m.name))}">`).join("")}</span><span class="grow"></span><button class="chip" data-tren="${t.id}">Renomear</button><button class="chip" data-tdup="${t.id}">Duplicar</button><button class="chip" data-tdel="${t.id}">Excluir</button></div>`).join("");
+  const rows = teamsData.list.filter(t => (t.kind || "comp") === KIND).map(t => `<div class="trow${t.id === teamsData.cur ? " cur" : ""}"><button class="tname" data-tsw="${t.id}" title="Abrir este time">${esc(t.name)}</button><span class="mute">${t.members.length}/6 · ${esc(KIND === "aventura" ? "Aventura" : (TFMT[t.fmt] || TFMT.vgc).label)}</span><span class="tsp">${t.members.map(m => `<img src="${esc(m.sprite)}" alt="" title="${esc(tdisp(m.name))}">`).join("")}</span><span class="grow"></span><button class="chip" data-tren="${t.id}">Renomear</button><button class="chip" data-tdup="${t.id}">Duplicar</button><button class="chip" data-tdel="${t.id}">Excluir</button></div>`).join("");
   box.innerHTML = `<div class="card"><h3>Meus times</h3>${rows}<button class="chip" data-tnew>+ Novo time</button>
     <h3 style="margin-top:14px">Compartilhar</h3><p class="mute" style="margin:0 0 6px">Gera um link com o time atual (Pokémon e sets escolhidos). Quem abrir recebe uma cópia, sem mexer nos times dele.</p>
     <button class="chip" data-tlink>Copiar link do time atual</button> <span id="tlinkinfo" class="mute"></span>
@@ -469,7 +474,7 @@ async function competitive(kind) {
   const nav = `<div class="gnav"><span class="mute">Formato:</span>${CFMTS.map(([k, l]) => `<button class="chip${k === kind ? " on" : ""}" data-cf="${k}">${l}</button>`).join("")}</div>`;
   const genKey = kind === "vgc" ? "champions" : "9";
   const keep = kind === "singles" ? (t => SINGLES_TIERS.includes(t)) : (t => /^vgc/.test(t));
-  let st; try { st = await loadStats(kind, pretty(mon.name)); } catch (e) { st = { err: e.message }; }
+  let st; try { st = await loadStats(kind, dn(mon.name)); } catch (e) { st = { err: e.message }; }
   let left = "", aside = "", usage = null;
   if (st.d) {
     const d = st.d, n = d.n, L = (key, c) => topN(pick(d, key, key.toLowerCase()), c, n);
@@ -547,7 +552,7 @@ async function coverMons(weak, typeData, cover, avail, exclude) {
   const mul = (types, atk) => types.reduce((m, t) => { const r = TD[t].damage_relations; return m * (r.no_damage_from.some(x => x.name === atk) ? 0 : r.double_damage_from.some(x => x.name === atk) ? 2 : r.half_damage_from.some(x => x.name === atk) ? .5 : 1); }, 1);
   const rows = data.map(p => { const ct = p.types.map(t => t.type.name), res = weak.filter(w => mul(ct, w) < 1), bad = weak.filter(w => mul(ct, w) > 1); return { p, ct, res, score: res.length * 2 - bad.length }; })
     .filter(x => x.res.length).sort((a, b) => b.score - a.score).slice(0, 6);
-  return rows.map(x => `<div class="mrow"><button class="mate" data-n="${esc(x.p.name)}"><img src="${x.p.sprites.front_default || ""}" alt=""><span class="mn"><b>${esc(pretty(x.p.name))}</b><br>${x.ct.map(badge).join("")}<br><span class="mute" style="font-size:.75rem">Resiste a: ${x.res.map(pretty).join(", ")}</span></span></button>${addBtn(x.p.name, true)}</div>`).join("") || '<p class="mute">Nenhuma sugestão encontrada.</p>';
+  return rows.map(x => `<div class="mrow"><button class="mate" data-n="${esc(x.p.name)}"><img src="${x.p.sprites.front_default || ""}" alt=""><span class="mn"><b>${esc(tdisp(x.p.name))}</b><br>${x.ct.map(badge).join("")}<br><span class="mute" style="font-size:.75rem">Resiste a: ${x.res.map(pretty).join(", ")}</span></span></button>${addBtn(x.p.name, true)}</div>`).join("") || '<p class="mute">Nenhuma sugestão encontrada.</p>';
 }
 
 async function casual() {
@@ -585,7 +590,7 @@ async function casual() {
 
   let roles = "";
   try {
-    const raw = await j("data/casual.json"), key = Object.keys(raw).find(k => norm(k) === norm(pretty(mon.name)));
+    const raw = await j("data/casual.json"), key = Object.keys(raw).find(k => norm(k) === norm(dn(mon.name)));
     if (key) {
       const [mi, ii, ai] = await Promise.all([index("move"), index("item"), index("ability")]);
       const nm = (map, k) => map[norm(k)] ? pretty(map[norm(k)]) : k;
@@ -671,7 +676,8 @@ function artFor(g) {
   const still = ((s.other || {})["official-artwork"] || {})[k] || ((s.other || {}).home || {})[k] || s[k] || s.front_default;
   if (g && ANIM_GENS.includes(g.gen)) {
     const n = mon.name, base = "https://play.pokemonshowdown.com/sprites/" + (shiny ? "ani-shiny/" : "ani/");
-    return [[base + n + ".gif", base + n.replace(/-/g, "") + ".gif", base + n.split("-")[0] + ".gif", still], false];
+    const sn = n.replace(/-female$/, "-f").replace(/-male$/, "");
+    return [[...new Set([base + sn + ".gif", base + n + ".gif", base + n.replace(/-/g, "") + ".gif", base + n.split("-")[0] + ".gif"])].concat([still]), false];
   }
   if (v) { const a = (v.animated && v.animated[k]) || v[k]; if (a) return [[a, still], true]; }
   return [[still], false];
@@ -740,6 +746,19 @@ async function renderGame() {
   $("locs").innerHTML = (note ? `<p class="mute" style="margin:0 0 4px">${esc(note)}</p>` : "") + L.map(x => `<div class="loc"><span><b>${esc(x.n)}</b>${x.tag ? `<span class="tg${x.dlc ? " dlc" : ""}">${esc(x.tag)}</span>` : ""}</span><span class="mute">${x.lv[1] ? "Lv " + (x.lv[0] === x.lv[1] ? x.lv[0] : x.lv[0] + "–" + x.lv[1]) + " · " : ""}${esc(x.m)} · ${x.ch}%</span></div>`).join("");
 }
 
+const genderHtml = m => { const g = genderOf(m.name); return g ? `<div class="gtog"><button class="chip${g.g === "male" ? " on" : ""}" data-n="${esc(g.base + "-male")}">♂ Macho</button><button class="chip${g.g === "female" ? " on" : ""}" data-n="${esc(g.base + "-female")}">♀ Fêmea</button><div class="mute" id="gdiff"></div></div>` : ""; };
+async function fillGender() {
+  const g = genderOf(mon.name), el = $("gdiff"); if (!g || !el) return;
+  const other = await fetchMon(g.base + "-" + (g.g === "male" ? "female" : "male")).catch(() => null);
+  if (!other || $("gdiff") !== el) return;
+  const [M, F] = g.g === "male" ? [mon, other] : [other, mon], diffs = [];
+  M.stats.forEach((st, i) => { if (st.base_stat !== F.stats[i].base_stat) diffs.push(`${NS[i]} ${st.base_stat} × ${F.stats[i].base_stat}`); });
+  const tm = M.types.map(t => pretty(t.type.name)).join("/"), tf = F.types.map(t => pretty(t.type.name)).join("/");
+  if (tm !== tf) diffs.push(`Tipos ${tm} × ${tf}`);
+  const ab = P => P.abilities.map(a => pretty(a.ability.name)).sort().join(", "), am = ab(M), af = ab(F);
+  if (am !== af) diffs.push(`Habilidades ${am} × ${af}`);
+  el.textContent = diffs.length ? "Diferenças ♂ × ♀: " + diffs.join(" · ") : "♂ e ♀ são iguais em stats, tipos e habilidades (muda só a aparência).";
+}
 function shell() {
   const m = mon, have = versionsWithData(), known = new Set(GROUPS.flatMap(allVers));
   curGames = GROUPS.concat([...have].filter(v => !known.has(v) && !GROUPS.some(g => g.dlcRe && g.dlcRe.test(v))).map(v => ({ id: v, gen: "Outros", name: gname(v), vs: [v] })));
@@ -748,7 +767,7 @@ function shell() {
   const sel = `<select id="game" aria-label="Jogo">${gens.map(gn => `<optgroup label="${gn === "Outros" ? "Outros" : "Geração " + gn}">${curGames.filter(g => g.gen === gn).map(g => `<option value="${g.id}"${g.id === game ? " selected" : ""}>${esc(g.name)}</option>`).join("")}</optgroup>`).join("")}</select>`;
   const genus = m.sp ? ((m.sp.genera || []).find(x => x.language.name === "en") || {}).genus : "";
   return `<div class="card hd" id="hdr">
-  <div class="top"><div class="artw"><img id="art" alt="${esc(pretty(m.name))}"><button class="shbtn${shiny ? " on" : ""}" id="shbtn" data-shiny title="Alternar versão shiny" aria-pressed="${shiny}">✨</button></div><div class="hr"><h2>${esc(pretty(m.name))} <small class="mute">#${m.id}${genus ? " · " + esc(genus) : ""}</small></h2><div>${m.types.map(t => badge(t.type.name)).join("")}</div>${addBtn(m.name, false)}<a class="xlink" href="${PAGE === "casual" ? "competitivo.html" : "casual.html"}?p=${encodeURIComponent(m.name)}">${PAGE === "casual" ? "Ver no Competitivo →" : "Ver no Casual →"}</a></div></div>
+  <div class="top"><div class="artw"><img id="art" alt="${esc(disp(m.name))}"><button class="shbtn${shiny ? " on" : ""}" id="shbtn" data-shiny title="Alternar versão shiny" aria-pressed="${shiny}">✨</button></div><div class="hr"><h2>${esc(disp(m.name))} <small class="mute">#${m.id}${genus ? " · " + esc(genus) : ""}</small></h2><div>${m.types.map(t => badge(t.type.name)).join("")}</div>${genderHtml(m)}${addBtn(m.name, false)}<a class="xlink" href="${PAGE === "casual" ? "competitivo.html" : "casual.html"}?p=${encodeURIComponent(m.name)}">${PAGE === "casual" ? "Ver no Competitivo →" : "Ver no Casual →"}</a></div></div>
   <div class="mid"><div class="sts">${m.stats.map((s, i) => `<div class="s"><span>${NS[i]}</span><b>${s.base_stat}</b><div class="bar"><i style="width:${Math.min(100, s.base_stat / 1.6)}%"></i></div></div>`).join("")}</div>
   <div class="bubble"><p id="desc"></p></div></div>
   <div class="where"><div class="wh"><b>Onde encontrar</b>${sel}</div><div id="locs" class="locs"></div></div></div>
@@ -874,7 +893,7 @@ async function setCards(blocks, usage, dex) {
 
 // Cartão de estratégias do Smogon. genKey: "1".."9" ou "champions"; keep: quais formatos mostrar.
 async function stratCard(genKey, keep, usage) {
-  const name = pretty(mon.name), gl = (SGENS.find(x => x[0] === genKey) || [0, genKey])[1];
+  const name = dn(mon.name), gl = (SGENS.find(x => x[0] === genKey) || [0, genKey])[1];
   const link = `<p class="mute" style="margin:6px 0 0">Análise completa no <a href="https://www.smogon.com/dex/${DEXCODE[genKey]}/pokemon/${slug(name)}/" target="_blank" rel="noopener">Smogon Strategy Dex</a>.</p>`;
   let raw = null;
   try { raw = await j(`data/strategies/${genKey}.json`); } catch (e) {}
@@ -906,12 +925,13 @@ async function show(raw) {
   const id = raw.trim().toLowerCase().replace(/\s+/g, "-");
   if (!id) return;
   $("out").innerHTML = '<p class="mute">Buscando…</p>';
-  try { mon = await j(`${POKEAPI}/pokemon/${id}`); }
-  catch { $("out").innerHTML = `<div class="card">Não encontrei "${esc(raw)}". Confira o nome (em inglês).</div>`; return; }
-  $("q").value = pretty(mon.name);
+  const found = await fetchMon(raw);
+  if (!found) { $("out").innerHTML = `<div class="card">Não encontrei "${esc(raw)}". Confira o nome (em inglês).</div>`; return; }
+  mon = found;
+  $("q").value = disp(mon.name);
   const [sp, enc] = await Promise.all([j(mon.species.url).catch(() => null), j(mon.location_area_encounters).catch(() => [])]);
   mon.sp = sp; mon.enc = enc || [];
-  $("out").innerHTML = shell(); renderGame(); renderTab();
+  $("out").innerHTML = shell(); renderGame(); renderTab(); fillGender();
   try { localStorage.setItem("pklast", JSON.stringify({ name: mon.name, area: PAGE })); history.replaceState(null, "", location.pathname + "?p=" + encodeURIComponent(mon.name) + (PAGE === "comp" && cfmt !== "vgc" ? "&f=" + cfmt : "")); } catch (e) {}
 }
 
@@ -972,4 +992,4 @@ renderTeam();
 loadFromHash();
 if (initialP) show(initialP);
 if (typeof window !== "undefined") window.addEventListener("hashchange", loadFromHash);
-$("foot").innerHTML = '<b>Créditos</b> <span id="ver">· versão: etapa 4.1 (nova busca)</span><br>Estatísticas de uso, sets e estratégias: <a href="https://www.smogon.com" target="_blank" rel="noopener">Smogon</a> (<a href="https://www.smogon.com/stats/" target="_blank" rel="noopener">stats</a> e <a href="https://www.smogon.com/dex/" target="_blank" rel="noopener">Strategy Dex</a>), reunidos em formato aberto pelo projeto <a href="https://github.com/pkmn" target="_blank" rel="noopener">pkmn</a>. Sets do Random Battle e sprites animados: <a href="https://play.pokemonshowdown.com" target="_blank" rel="noopener">Pokémon Showdown</a>. Pokémon, golpes, itens, locais e imagens: <a href="https://pokeapi.co" target="_blank" rel="noopener">PokéAPI</a>. Tradução automática: <a href="https://mymemory.translated.net" target="_blank" rel="noopener">MyMemory</a>.<br>Projeto de fã, não oficial e sem vínculo com Nintendo, Game Freak, The Pokémon Company ou Smogon. Pokémon e seus nomes são marcas dos respectivos donos.';
+$("foot").innerHTML = '<b>Créditos</b> <span id="ver">· versão: etapa 4.2 (macho/fêmea)</span><br>Estatísticas de uso, sets e estratégias: <a href="https://www.smogon.com" target="_blank" rel="noopener">Smogon</a> (<a href="https://www.smogon.com/stats/" target="_blank" rel="noopener">stats</a> e <a href="https://www.smogon.com/dex/" target="_blank" rel="noopener">Strategy Dex</a>), reunidos em formato aberto pelo projeto <a href="https://github.com/pkmn" target="_blank" rel="noopener">pkmn</a>. Sets do Random Battle e sprites animados: <a href="https://play.pokemonshowdown.com" target="_blank" rel="noopener">Pokémon Showdown</a>. Pokémon, golpes, itens, locais e imagens: <a href="https://pokeapi.co" target="_blank" rel="noopener">PokéAPI</a>. Tradução automática: <a href="https://mymemory.translated.net" target="_blank" rel="noopener">MyMemory</a>.<br>Projeto de fã, não oficial e sem vínculo com Nintendo, Game Freak, The Pokémon Company ou Smogon. Pokémon e seus nomes são marcas dos respectivos donos.';
