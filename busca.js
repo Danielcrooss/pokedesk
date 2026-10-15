@@ -1,7 +1,7 @@
 /* Busca de Pokémon (compartilhada pelas três páginas). Uso: PokeSearch.attach(input, { onSelect(nome), onSubmit(texto) }) */
 (function () {
   "use strict";
-  const VERSION = "4.2";
+  const VERSION = "4.3";
   const POKEAPI = "https://pokeapi.co/api/v2";
   const SPR = id => "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/" + id + ".png";
   const TC = { normal: "#9fa19f", fire: "#e8622a", water: "#4592e6", electric: "#e8b800", grass: "#3fa129", ice: "#3dcef3", fighting: "#d3425f", poison: "#9f5bd0", ground: "#a97a4a", flying: "#7fa4e8", psychic: "#ee6b7a", bug: "#8fa31b", rock: "#b8a86e", ghost: "#6c5aa8", dragon: "#4f60e2", dark: "#5b5466", steel: "#5a8ea5", fairy: "#ee90e6" };
@@ -11,26 +11,32 @@
   const isSub = (k, n) => { let i = 0; for (let c = 0; c < k.length && i < n.length; c++) if (k[c] === n[i]) i++; return i === n.length; };
 
   // ---- lista de nomes (guardada no navegador por 7 dias) ----
-  const KEY = "pknames1";
+  const KEY = "pknames2";
   let all = [], listeners = [];
-  const mk = (n, id, base, merged) => ({ n, id, p: pretty(base), k: norm(base), w: base.split("-").map(norm), merged });
-  // Macho e fêmea separados na PokéAPI (Indeedee, Basculegion...) viram um resultado só; a página mostra os dois.
-  const build = list => {
+  const mk = (n, id, base, merged) => ({ n, id, base, p: pretty(base), k: norm(base), k2: norm(n), w: base.split("-").map(norm), merged });
+  // A forma padrão mostra o nome da ESPÉCIE (Landorus, não "Landorus Incarnate"); macho/fêmea separados viram um resultado só.
+  const build = (list, sp) => {
+    sp = sp || {};
     const names = new Set(list.map(x => x[0])), out = [];
     list.forEach(([n, id]) => {
-      const m = n.match(/^(.*)-(male|female)$/);
-      if (m && names.has(m[1] + "-male") && names.has(m[1] + "-female")) { if (m[2] === "male") out.push(mk(n, id, m[1], true)); }
-      else out.push(mk(n, id, n, false));
+      const g = n.match(/^(.*)-(male|female)$/);
+      if (g && names.has(g[1] + "-male") && names.has(g[1] + "-female")) { if (g[2] === "male") out.push(mk(n, id, sp[id] || g[1], true)); return; }
+      out.push(mk(n, id, id <= 1025 && sp[id] ? sp[id] : n, false));
     });
     return out;
   };
   (function load() {
     let cached = null; try { cached = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
-    if (cached && Array.isArray(cached.list) && cached.list.length) all = build(cached.list);
+    if (cached && Array.isArray(cached.list) && cached.list.length) all = build(cached.list, cached.sp);
     if (all.length && Date.now() - (cached.t || 0) < 7 * 864e5) return;
-    fetch(POKEAPI + "/pokemon?limit=1400").then(r => r.json()).then(d => {
-      const list = d.results.map(r => [r.name, +String(r.url || "").split("/").filter(Boolean).pop() || 0]);
-      all = build(list); try { localStorage.setItem(KEY, JSON.stringify({ t: Date.now(), list })); } catch (e) {}
+    const idOf = r => +String(r.url || "").split("/").filter(Boolean).pop() || 0;
+    Promise.all([
+      fetch(POKEAPI + "/pokemon?limit=1400").then(r => r.json()),
+      fetch(POKEAPI + "/pokemon-species?limit=1100").then(r => r.json()).catch(() => ({ results: [] }))
+    ]).then(([d, s]) => {
+      const list = d.results.map(r => [r.name, idOf(r)]), sp = {};
+      ((s && s.results) || []).forEach(r => { sp[idOf(r)] = r.name; });
+      all = build(list, sp); try { localStorage.setItem(KEY, JSON.stringify({ t: Date.now(), list, sp })); } catch (e) {}
       listeners.forEach(f => f());
     }).catch(() => {});
   })();
@@ -42,10 +48,12 @@
       let sc = 0;
       if (isNum && String(it.id) === s) sc = 100;
       else if (it.k === n) sc = 90;
+      else if (it.k2 === n) sc = 85;
       else if (it.k.indexOf(n) === 0) sc = 70;
+      else if (it.k2.indexOf(n) === 0) sc = 65;
       else if (it.w.some(w => w.indexOf(n) === 0)) sc = 50;
-      else if (it.k.indexOf(n) >= 0) sc = 30;
-      else if (n.length >= 3 && isSub(it.k, n)) sc = 10;
+      else if (it.k.indexOf(n) >= 0 || it.k2.indexOf(n) >= 0) sc = 30;
+      else if (n.length >= 3 && isSub(it.k2, n)) sc = 10;
       if (sc) out.push([sc - (it.id > 1025 ? 5 : 0) - it.k.length / 100, it]);
     }
     return out.sort((a, b) => b[0] - a[0]).slice(0, 8).map(x => x[1]);
@@ -53,7 +61,10 @@
 
   const ART = id => "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/" + id + ".png";
   // Se a imagem padrão não existir, tenta a arte oficial e depois a imagem que a própria PokéAPI informa.
-  window.__pkImgFail = img => { const st = +img.dataset.st || 0; img.dataset.st = st + 1; if (st === 0) img.src = ART(img.dataset.id); else if (st === 1 && img.dataset.api) img.src = img.dataset.api; else img.style.visibility = "hidden"; };
+  const SD = x => "https://play.pokemonshowdown.com/sprites/dex/" + x + ".png";
+  const PLACE = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='12' r='9' fill='none' stroke='%238d96b0' stroke-width='1.5'/><path d='M3 12h18' stroke='%238d96b0' stroke-width='1.5'/><circle cx='12' cy='12' r='2.5' fill='%238d96b0'/></svg>";
+  const fallbacks = it => [ART(it.id)].concat([...new Set([norm(it.base), it.n])].map(SD));
+  window.__pkImgFail = img => { const l = (img.dataset.fb || "").split("|").filter(Boolean), n = l.shift(); img.dataset.fb = l.join("|"); if (n) img.src = n; else { img.onerror = null; img.dataset.dead = "1"; img.src = PLACE; } };
   const meta = {};
   function loadMeta(it, cb) {
     if (meta[it.id]) return cb(meta[it.id]);
@@ -94,7 +105,7 @@
     function row(it, q, i) {
       const idx = q ? it.p.toLowerCase().indexOf(q.toLowerCase()) : -1;
       const name = idx >= 0 ? esc(it.p.slice(0, idx)) + "<b>" + esc(it.p.slice(idx, idx + q.length)) + "</b>" + esc(it.p.slice(idx + q.length)) : esc(it.p);
-      return '<div class="sitem" role="option" id="so-' + list.id + "-" + i + '" data-i="' + i + '" aria-selected="false"><img src="' + SPR(it.id) + '" data-id="' + it.id + '" alt="" loading="lazy" onerror="__pkImgFail(this)"><div class="sn"><span>' + name + "</span><small>" + ((it.id && it.id <= 1025 ? "#" + String(it.id).padStart(4, "0") : "forma alternativa") + (it.merged ? " · ♂ ♀" : "")) + '</small></div><span class="stp"></span></div>';
+      return '<div class="sitem" role="option" id="so-' + list.id + "-" + i + '" data-i="' + i + '" aria-selected="false"><img src="' + SPR(it.id) + '" data-fb="' + esc(fallbacks(it).join("|")) + '" alt="" loading="lazy" onerror="__pkImgFail(this)"><div class="sn"><span>' + name + "</span><small>" + ((it.id && it.id <= 1025 ? "#" + String(it.id).padStart(4, "0") : "forma alternativa") + (it.merged ? " · ♂ ♀" : "")) + '</small></div><span class="stp"></span></div>';
     }
     function render() {
       const q = input.value.trim(); clear.hidden = !input.value; kbd.hidden = !!input.value;
@@ -113,7 +124,7 @@
       active = items.length && q ? 0 : -1; setActive(active);
       list.querySelectorAll(".sitem").forEach((el, i) => loadMeta(items[i], mt => {
         const t = el.querySelector(".stp"); if (t) t.innerHTML = badges(mt.types);
-        const im = el.querySelector("img"); if (im && mt.sprite) { im.dataset.api = mt.sprite; if ((+im.dataset.st || 0) >= 2) { im.style.visibility = ""; im.src = mt.sprite; } }
+        const im = el.querySelector("img"); if (im && mt.sprite) { if (im.dataset.dead) { im.dataset.dead = ""; im.src = mt.sprite; } else im.dataset.fb = mt.sprite + "|" + (im.dataset.fb || ""); }
       }));
     }
     listeners.push(() => { if (document.activeElement === input) render(); });

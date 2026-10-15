@@ -1,6 +1,6 @@
 (function () {
   "use strict";
-  const VERSION = "4.2";
+  const VERSION = "4.3";
   // Links de time compartilhados antes da divisão em páginas apontavam para o início: levar ao Competitivo.
   if (location.hash.indexOf("#t=") === 0) { location.replace("competitivo.html" + location.hash); return; }
 
@@ -66,5 +66,5 @@
   document.addEventListener("click", e => { const b = e.target.closest("[data-top]"); if (b) top(b.dataset.top); });
   top(cur);
 
-  $("foot").innerHTML = '<b>Créditos</b> <span id="ver">· versão: etapa 4.2 (macho/fêmea)</span><br>Estatísticas de uso, sets e estratégias: <a href="https://www.smogon.com" target="_blank" rel="noopener">Smogon</a> (<a href="https://www.smogon.com/stats/" target="_blank" rel="noopener">stats</a> e <a href="https://www.smogon.com/dex/" target="_blank" rel="noopener">Strategy Dex</a>), reunidos em formato aberto pelo projeto <a href="https://github.com/pkmn" target="_blank" rel="noopener">pkmn</a>. Sets do Random Battle e sprites animados: <a href="https://play.pokemonshowdown.com" target="_blank" rel="noopener">Pokémon Showdown</a>. Pokémon, golpes, itens, locais e imagens: <a href="https://pokeapi.co" target="_blank" rel="noopener">PokéAPI</a>. Tradução automática: <a href="https://mymemory.translated.net" target="_blank" rel="noopener">MyMemory</a>.<br>Projeto de fã, não oficial e sem vínculo com Nintendo, Game Freak, The Pokémon Company ou Smogon. Pokémon e seus nomes são marcas dos respectivos donos.';
+  $("foot").innerHTML = '<b>Créditos</b> <span id="ver">· versão: etapa 4.3 (formas e imagens)</span><br>Estatísticas de uso, sets e estratégias: <a href="https://www.smogon.com" target="_blank" rel="noopener">Smogon</a> (<a href="https://www.smogon.com/stats/" target="_blank" rel="noopener">stats</a> e <a href="https://www.smogon.com/dex/" target="_blank" rel="noopener">Strategy Dex</a>), reunidos em formato aberto pelo projeto <a href="https://github.com/pkmn" target="_blank" rel="noopener">pkmn</a>. Sets do Random Battle e sprites animados: <a href="https://play.pokemonshowdown.com" target="_blank" rel="noopener">Pokémon Showdown</a>. Pokémon, golpes, itens, locais e imagens: <a href="https://pokeapi.co" target="_blank" rel="noopener">PokéAPI</a>. Tradução automática: <a href="https://mymemory.translated.net" target="_blank" rel="noopener">MyMemory</a>.<br>Projeto de fã, não oficial e sem vínculo com Nintendo, Game Freak, The Pokémon Company ou Smogon. Pokémon e seus nomes são marcas dos respectivos donos.';
 })();
