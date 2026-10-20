@@ -1,0 +1,88 @@
+{
+  "jogo": "sv",
+  "titulo": "Guia da história · Scarlet / Violet",
+  "rascunho": true,
+  "aviso": "Este guia é um RASCUNHO escrito sem consultar o jogo. Níveis, locais e métodos de evolução podem ter erros. Confira no jogo e corrija editando o arquivo guia-sv.json no GitHub.",
+  "etapas": [
+    {
+      "id": "comeco",
+      "titulo": "Começo da aventura",
+      "niveis": "1–15",
+      "nota": "Em Paldea você pode seguir os desafios (ginásios, Titãs e Team Star) na ordem que quiser. Os níveis são só uma referência.",
+      "desafios": [],
+      "pokemon": [
+        { "nome": "sprigatito", "porque": "Inicial de Planta. Vira Meowscarada (Planta/Sombrio): rápido, ataca forte e serve o jogo inteiro.", "onde": "Inicial (você recebe no começo)" },
+        { "nome": "fuecoco", "porque": "Inicial de Fogo. Vira Skeledirge (Fogo/Fantasma): resistente e com um tipo duplo útil contra vários desafios.", "onde": "Inicial (você recebe no começo)" },
+        { "nome": "quaxly", "porque": "Inicial de Água. Vira Quaquaval (Água/Lutador): rápido e com bom alcance de golpes.", "onde": "Inicial (você recebe no começo)" },
+        { "nome": "lechonk", "porque": "Fácil de achar bem cedo. Vira Oinkologne (Normal), um bom atacante físico para o começo.", "onde": "Província Sul (perto do início)" },
+        { "nome": "fletchling", "porque": "Vira Talonflame (Fogo/Voador), forte contra os tipos Inseto e Planta dos primeiros desafios.", "onde": "Província Sul" },
+        { "nome": "pawmi", "porque": "Tipo Elétrico fácil de achar cedo. Evolui duas vezes e vira Pawmot (Elétrico/Lutador).", "onde": "Província Sul" }
+      ]
+    },
+    {
+      "id": "primeiros",
+      "titulo": "Primeiros desafios",
+      "niveis": "15–25",
+      "nota": "Vale levar um Pokémon de Fogo ou Voador para os tipos Inseto e Planta, e um de Terra para o tipo Elétrico.",
+      "desafios": [
+        { "nome": "Katy", "tipoDesafio": "Ginásio", "tipo": "bug", "local": "Cortondo" },
+        { "nome": "Brassius", "tipoDesafio": "Ginásio", "tipo": "grass", "local": "Artazon" },
+        { "nome": "Iono", "tipoDesafio": "Ginásio", "tipo": "electric", "local": "Levincia" },
+        { "nome": "Klawf", "tipoDesafio": "Titã", "tipo": "rock" }
+      ],
+      "pokemon": [
+        { "nome": "nymble", "porque": "Vira Lokix (Inseto/Sombrio), rápido e com bom ataque físico.", "onde": "Província Sul" },
+        { "nome": "smoliv", "porque": "Vira Arboliva (Planta/Normal), resistente e com golpes de recuperação.", "onde": "Província Sul" },
+        { "nome": "wooper-paldea", "porque": "Vira Clodsire (Venenoso/Terra): imune a golpes Elétricos, ótimo contra o ginásio de Iono." },
+        { "nome": "tinkatink", "porque": "Vira Tinkaton (Fada/Aço): ataca forte e tem tipos defensivos muito bons." }
+      ]
+    },
+    {
+      "id": "meio",
+      "titulo": "Meio da história",
+      "niveis": "25–40",
+      "nota": "Aqui já compensa ter cobertura de tipos variada. Alguns dos melhores Pokémon do jogo evoluem com condições especiais.",
+      "desafios": [
+        { "nome": "Kofu", "tipoDesafio": "Ginásio", "tipo": "water", "local": "Cascarrafa" },
+        { "nome": "Larry", "tipoDesafio": "Ginásio", "tipo": "normal", "local": "Medali" }
+      ],
+      "pokemon": [
+        { "nome": "primeape", "porque": "Evolui para Annihilape (Lutador/Fantasma) depois de usar o golpe Rage Fist várias vezes. Muito forte.", "evolucao": "Usar Rage Fist 20 vezes e depois subir de nível" },
+        { "nome": "gimmighoul", "porque": "Vira Gholdengo (Aço/Fantasma), um dos melhores Pokémon do jogo.", "evolucao": "Juntar 999 moedas de Gimmighoul e subir de nível" },
+        { "nome": "bisharp", "porque": "Vira Kingambit (Sombrio/Aço), um atacante físico muito forte.", "evolucao": "Derrotar três Bisharp líderes e subir de nível" }
+      ]
+    },
+    {
+      "id": "reta",
+      "titulo": "Reta final",
+      "niveis": "40–50",
+      "nota": "Os últimos ginásios pedem Pokémon de tipos variados. Planeje o time antes de enfrentar cada líder.",
+      "desafios": [
+        { "nome": "Ryme", "tipoDesafio": "Ginásio", "tipo": "ghost", "local": "Montenevera" },
+        { "nome": "Tulip", "tipoDesafio": "Ginásio", "tipo": "psychic", "local": "Alfornada" },
+        { "nome": "Grusha", "tipoDesafio": "Ginásio", "tipo": "ice", "local": "Glaseado" }
+      ],
+      "pokemon": [
+        { "nome": "frigibax", "porque": "Evolui duas vezes e vira Baxcalibur (Dragão/Gelo), muito forte, mas só no final da evolução.", "onde": "Região Norte (Glaseado)" },
+        { "nome": "nacli", "porque": "Vira Garganacl (Pedra), muito resistente.", "evolucao": "Evolui duas vezes por nível" }
+      ]
+    },
+    {
+      "id": "final",
+      "titulo": "Elite Four e Campeã",
+      "niveis": "50+",
+      "nota": "Cada membro da Elite Four tem um tipo. Leve Pokémon que resistam ou ataquem forte contra eles.",
+      "desafios": [
+        { "nome": "Rika", "tipoDesafio": "Elite Four", "tipo": "ground" },
+        { "nome": "Poppy", "tipoDesafio": "Elite Four", "tipo": "steel" },
+        { "nome": "Larry", "tipoDesafio": "Elite Four", "tipo": "flying" },
+        { "nome": "Hassel", "tipoDesafio": "Elite Four", "tipo": "dragon" }
+      ],
+      "pokemon": [
+        { "nome": "gholdengo", "porque": "Aço/Fantasma: resiste a muitos tipos e ataca com golpes variados." },
+        { "nome": "baxcalibur", "porque": "Dragão/Gelo: forte contra o tipo Dragão e o tipo Voador." },
+        { "nome": "annihilape", "porque": "Lutador/Fantasma: boa cobertura ofensiva." }
+      ]
+    }
+  ]
+}

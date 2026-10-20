@@ -5,7 +5,7 @@ const GAME = "scarlet-violet";
 
 const NS = ["PS","Atq","Def","SpA","SpD","Vel"];
 const TC = {normal:"#9fa19f",fire:"#e8622a",water:"#4592e6",electric:"#e8b800",grass:"#3fa129",ice:"#3dcef3",fighting:"#d3425f",poison:"#9f5bd0",ground:"#a97a4a",flying:"#7fa4e8",psychic:"#ee6b7a",bug:"#8fa31b",rock:"#b8a86e",ghost:"#6c5aa8",dragon:"#4f60e2",dark:"#5b5466",steel:"#5a8ea5",fairy:"#ee90e6"};
-const APP_VERSION = "4.3";
+const APP_VERSION = "4.4";
 const PAGE = (typeof document !== "undefined" && document.body && document.body.dataset && document.body.dataset.page) || "comp";
 const KIND = PAGE === "casual" ? "aventura" : "comp";
 const MODES = PAGE === "casual" ? [["casual", "Casual"]] : [["comp", "Competitivo"], ["strat", "Outras gerações"]];
@@ -791,7 +791,7 @@ function shell() {
   <div class="top"><div class="artw"><img id="art" alt="${esc(dispOf(m))}"><button class="shbtn${shiny ? " on" : ""}" id="shbtn" data-shiny title="Alternar versão shiny" aria-pressed="${shiny}">✨</button></div><div class="hr"><h2>${esc(dispOf(m))} <small class="mute">#${m.id}${genus ? " · " + esc(genus) : ""}</small></h2><div>${m.types.map(t => badge(t.type.name)).join("")}</div>${formsHtml(m)}${addBtn(m.name, false)}<a class="xlink" href="${PAGE === "casual" ? "competitivo.html" : "casual.html"}?p=${encodeURIComponent(m.name)}">${PAGE === "casual" ? "Ver no Competitivo →" : "Ver no Casual →"}</a></div></div>
   <div class="mid"><div class="sts">${m.stats.map((s, i) => `<div class="s"><span>${NS[i]}</span><b>${s.base_stat}</b><div class="bar"><i style="width:${Math.min(100, s.base_stat / 1.6)}%"></i></div></div>`).join("")}</div>
   <div class="bubble"><p id="desc"></p></div></div>
-  <div class="where"><div class="wh"><b>Onde encontrar</b>${sel}</div><div id="locs" class="locs"></div></div></div>
+  <div class="where"><div class="wh"><b>Onde encontrar</b>${PAGE === "casual" ? `<span class="mute">${esc((G() || {}).name || "")}</span>` : sel}</div><div id="locs" class="locs"></div></div></div>
   ${MODES.length > 1 ? `<div class="tabs" role="tablist">${MODES.map(x => `<button class="tab" role="tab" data-m="${x[0]}" aria-selected="${x[0] === mode}">${x[1]}</button>`).join("")}</div>` : ""}<div id="tab"></div>`;
 }
 
@@ -1013,4 +1013,4 @@ renderTeam();
 loadFromHash();
 if (initialP) show(initialP);
 if (typeof window !== "undefined") window.addEventListener("hashchange", loadFromHash);
-$("foot").innerHTML = '<b>Créditos</b> <span id="ver">· versão: etapa 4.3 (formas e imagens)</span><br>Estatísticas de uso, sets e estratégias: <a href="https://www.smogon.com" target="_blank" rel="noopener">Smogon</a> (<a href="https://www.smogon.com/stats/" target="_blank" rel="noopener">stats</a> e <a href="https://www.smogon.com/dex/" target="_blank" rel="noopener">Strategy Dex</a>), reunidos em formato aberto pelo projeto <a href="https://github.com/pkmn" target="_blank" rel="noopener">pkmn</a>. Sets do Random Battle e sprites animados: <a href="https://play.pokemonshowdown.com" target="_blank" rel="noopener">Pokémon Showdown</a>. Pokémon, golpes, itens, locais e imagens: <a href="https://pokeapi.co" target="_blank" rel="noopener">PokéAPI</a>. Tradução automática: <a href="https://mymemory.translated.net" target="_blank" rel="noopener">MyMemory</a>.<br>Projeto de fã, não oficial e sem vínculo com Nintendo, Game Freak, The Pokémon Company ou Smogon. Pokémon e seus nomes são marcas dos respectivos donos.';
+$("foot").innerHTML = '<b>Créditos</b> <span id="ver">· versão: etapa 4.4 (casual: time sugerido e guia)</span><br>Estatísticas de uso, sets e estratégias: <a href="https://www.smogon.com" target="_blank" rel="noopener">Smogon</a> (<a href="https://www.smogon.com/stats/" target="_blank" rel="noopener">stats</a> e <a href="https://www.smogon.com/dex/" target="_blank" rel="noopener">Strategy Dex</a>), reunidos em formato aberto pelo projeto <a href="https://github.com/pkmn" target="_blank" rel="noopener">pkmn</a>. Sets do Random Battle e sprites animados: <a href="https://play.pokemonshowdown.com" target="_blank" rel="noopener">Pokémon Showdown</a>. Pokémon, golpes, itens, locais e imagens: <a href="https://pokeapi.co" target="_blank" rel="noopener">PokéAPI</a>. Tradução automática: <a href="https://mymemory.translated.net" target="_blank" rel="noopener">MyMemory</a>.<br>Projeto de fã, não oficial e sem vínculo com Nintendo, Game Freak, The Pokémon Company ou Smogon. Pokémon e seus nomes são marcas dos respectivos donos.';

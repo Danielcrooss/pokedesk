@@ -6,23 +6,27 @@
 <title>Casual · Pokédesk</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="estilo.css?v=4.3">
+<link rel="stylesheet" href="estilo.css?v=4.4">
 </head>
-<body data-page="casual" data-v="4.3">
+<body data-page="casual" data-v="4.4">
 <main>
 <nav class="sitenav"><a class="brand" href="index.html">Pokédesk</a><a href="index.html">Início</a><a href="competitivo.html">Competitivo</a><a class="on" href="casual.html">Casual</a></nav>
 <h1>Casual · aventura</h1>
-<p class="sub">Para jogar a história: onde achar, evolução, golpes por nível e o time da aventura.</p>
-<input id="q" placeholder="Ex.: Garchomp" aria-label="Nome do Pokémon" autocomplete="off">
+<p class="sub">Para jogar a história: um time sugerido para o seu jogo, um guia do que pegar em cada parte e os detalhes de cada Pokémon.</p>
 <div id="errbar" class="errbar" hidden></div>
+<div class="gbar" id="gamebar"></div>
 <div id="team"></div>
 <div id="tanalysis"></div>
 <div id="tsets"></div>
 <div id="tmgr"></div>
-<div id="out"></div>
+<div class="tabs" id="ctabs" role="tablist"></div>
+<section id="pane-poke"><input id="q" placeholder="Ex.: Garchomp" aria-label="Nome do Pokémon" autocomplete="off"><div id="out"></div></section>
+<section id="pane-team" hidden></section>
+<section id="pane-guide" hidden></section>
 <p class="mute" id="foot"></p>
 </main>
-<script src="busca.js?v=4.3"></script>
-<script src="app.js?v=4.3"></script>
+<script src="busca.js?v=4.4"></script>
+<script src="app.js?v=4.4"></script>
+<script src="casual.js?v=4.4"></script>
 </body>
 </html>

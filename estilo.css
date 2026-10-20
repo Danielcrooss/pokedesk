@@ -205,3 +205,35 @@ body[data-page="comp"] .where{display:none}
 .gtog{margin:6px 0 0}
 .gtog .chip{margin:0 6px 0 0}
 .gtog .mute{font-size:.75rem;margin-top:4px;line-height:1.4}
+
+/* ---- Casual: jogo, time sugerido e guia ---- */
+.gbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 10px}
+.gbar select{font-weight:600;max-width:100%}
+.filters{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;font-size:.85rem;margin:8px 0}
+.filters label{display:flex;align-items:center;gap:6px}
+.tgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:10px 0}
+.tc{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.tc .top2{display:flex;gap:10px;align-items:flex-start}
+.tc .top2 img{width:64px;height:64px;image-rendering:pixelated;flex:none}
+.tc .tcn{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.tc .tcn small{font-size:.72rem}
+.alts{display:flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:.72rem}
+.alts .chip{margin:0;padding:2px 8px;font-size:.72rem}
+.tsum{font-size:.85rem;line-height:1.6}
+.warn{background:rgba(232,184,0,.12);border:1px solid #e8b800;border-radius:10px;padding:8px 12px;font-size:.82rem;margin:0 0 10px;line-height:1.45}
+.stg{border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin:0 0 8px;background:var(--card2)}
+.stg>summary{cursor:pointer;font-size:.95rem}
+.chs{display:flex;flex-direction:column;gap:4px;margin:6px 0 8px}
+.ch{font-size:.85rem}
+.pk{display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
+.pk.got{opacity:.55}
+.pk img{width:56px;height:56px;image-rendering:pixelated;flex:none}
+.pkb{flex:1;min-width:0}
+.pkw{font-size:.78rem;line-height:1.4}
+.pka{display:flex;flex-direction:column;gap:4px;align-items:flex-end;font-size:.78rem}
+.pka .chip,.pka .addbtn{margin:0}
+@media(max-width:760px){.tgrid{grid-template-columns:1fr 1fr}}
+@media(max-width:520px){.tgrid{grid-template-columns:1fr}.pk{flex-wrap:wrap}.pka{flex-direction:row;flex-wrap:wrap;align-items:center}}
+
+input[type="checkbox"]{width:auto;padding:0;margin:0;border-radius:4px;accent-color:var(--acc)}
+.filters label{white-space:nowrap}
