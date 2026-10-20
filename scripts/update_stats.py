@@ -184,6 +184,116 @@ def casual_data():
     print(f"casual: {len(out)} pokemon")
 
 
+POKEAPI = "https://pokeapi.co/api/v2/"
+# Mesmo agrupamento de jogos usado no site (inclui as DLCs no jogo original).
+GAME_VERSIONS = {
+    "rb": ["red", "blue"], "y": ["yellow"], "gs": ["gold", "silver"], "c": ["crystal"],
+    "rs": ["ruby", "sapphire"], "e": ["emerald"], "frlg": ["firered", "leafgreen"],
+    "dp": ["diamond", "pearl"], "pt": ["platinum"], "hgss": ["heartgold", "soulsilver"],
+    "bw": ["black", "white"], "b2w2": ["black-2", "white-2"], "xy": ["x", "y"],
+    "oras": ["omega-ruby", "alpha-sapphire"], "sm": ["sun", "moon"], "usum": ["ultra-sun", "ultra-moon"],
+    "lg": ["lets-go-pikachu", "lets-go-eevee"],
+    "swsh": ["sword", "shield", "the-isle-of-armor", "the-crown-tundra", "the-isle-of-armor-sword",
+             "the-isle-of-armor-shield", "the-crown-tundra-sword", "the-crown-tundra-shield"],
+    "bdsp": ["brilliant-diamond", "shining-pearl"], "pla": ["legends-arceus"],
+    "sv": ["scarlet", "violet", "the-teal-mask", "the-indigo-disk", "the-teal-mask-scarlet",
+           "the-teal-mask-violet", "the-indigo-disk-scarlet", "the-indigo-disk-violet"],
+}
+
+
+def api(path, tries=3):
+    import time
+    for k in range(tries):
+        try:
+            return json.loads(get(POKEAPI + path))
+        except Exception:
+            if k == tries - 1:
+                raise
+            time.sleep(1.5 * (k + 1))
+
+
+def pokedex_data(max_age_days=20, workers=6):
+    """Tipos, stats e estagio de evolucao de cada especie + quais especies existem em cada jogo.
+    Alimenta o 'Time sugerido' da pagina Casual. So refaz se o arquivo tiver mais de 20 dias."""
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+    os.makedirs("data", exist_ok=True)
+    try:
+        old = json.load(open("data/pokedex.json", encoding="utf-8"))
+        if time.time() - old.get("t", 0) < max_age_days * 86400 and os.path.exists("data/games.json"):
+            print("pokedex: dados recentes, nada a fazer")
+            return
+    except Exception:
+        pass
+
+    species = api("pokemon-species?limit=2000")["results"]
+    ids = sorted(int(r["url"].rstrip("/").split("/")[-1]) for r in species)
+    print(f"pokedex: {len(ids)} especies para buscar")
+
+    def one(i):
+        try:
+            sp = api(f"pokemon-species/{i}")
+            default = next((v["pokemon"]["name"] for v in sp.get("varieties", []) if v.get("is_default")), sp["name"])
+            pk = api(f"pokemon/{default}")
+            stats = {s["stat"]["name"]: s["base_stat"] for s in pk["stats"]}
+            kind = 3 if sp.get("is_baby") else 2 if sp.get("is_mythical") else 1 if sp.get("is_legendary") else 0
+            frm = sp.get("evolves_from_species")
+            frm_id = int(frm["url"].rstrip("/").split("/")[-1]) if frm else 0
+            return i, [sp["name"], default, [t["type"]["name"] for t in sorted(pk["types"], key=lambda t: t["slot"])],
+                       [stats.get(k, 0) for k in ("hp", "attack", "defense", "special-attack", "special-defense", "speed")],
+                       kind, frm_id, 1]
+        except Exception as e:
+            print(f"pokedex: especie {i} falhou ({e})", file=sys.stderr)
+            return i, None
+
+    d = {}
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        for n, (i, rec) in enumerate(ex.map(one, ids), 1):
+            if rec:
+                d[str(i)] = rec
+            if n % 200 == 0:
+                print(f"pokedex: {n}/{len(ids)}")
+    parents = {rec[5] for rec in d.values() if rec[5]}
+    for i, rec in d.items():
+        rec[6] = 0 if int(i) in parents else 1          # 1 = forma final (nao evolui mais)
+    if len(d) < len(ids) * 0.9:
+        raise RuntimeError(f"so {len(d)} de {len(ids)} especies baixadas; mantendo o arquivo anterior")
+
+    # quais especies existem em cada jogo (Pokedex do jogo, incluindo DLCs)
+    vcache, gcache, dcache = {}, {}, {}
+    def entries(url_path):
+        if url_path not in dcache:
+            try:
+                dcache[url_path] = {int(e["pokemon_species"]["url"].rstrip("/").split("/")[-1]) for e in api(url_path)["pokemon_entries"]}
+            except Exception:
+                dcache[url_path] = set()
+        return dcache[url_path]
+    games = {}
+    for gid, versions in GAME_VERSIONS.items():
+        found = set()
+        for v in versions:
+            try:
+                if v not in vcache:
+                    vcache[v] = api(f"version/{v}")["version_group"]["name"]
+                vg = vcache[v]
+                if vg not in gcache:
+                    gcache[vg] = [p["name"] for p in api(f"version-group/{vg}")["pokedexes"]]
+                for pdx in gcache[vg]:
+                    found |= entries(f"pokedex/{pdx}")
+            except Exception:
+                continue            # versao inexistente (ex.: DLC com outro nome): ignora
+        found &= {int(i) for i in d}
+        if found:
+            games[gid] = sorted(found)
+        print(f"pokedex: jogo {gid}: {len(found)} especies")
+
+    with open("data/pokedex.json", "w", encoding="utf-8") as fh:
+        json.dump({"v": 1, "t": int(time.time()), "d": d}, fh, ensure_ascii=False, separators=(",", ":"))
+    with open("data/games.json", "w", encoding="utf-8") as fh:
+        json.dump({"v": 1, "g": games}, fh, separators=(",", ":"))
+    print(f"pokedex: ok ({len(d)} especies, {len(games)} jogos)")
+
+
 def main():
     os.makedirs("data", exist_ok=True)
     ok = 0
@@ -208,6 +318,10 @@ def main():
         casual_data()
     except Exception as e:
         print(f"casual: erro {e}", file=sys.stderr)
+    try:
+        pokedex_data()
+    except Exception as e:
+        print(f"pokedex: erro {e}", file=sys.stderr)
     try:
         strategies()
     except Exception as e:
