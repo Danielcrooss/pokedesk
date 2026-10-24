@@ -1,7 +1,7 @@
 /* Busca de Pokémon (compartilhada pelas três páginas). Uso: PokeSearch.attach(input, { onSelect(nome), onSubmit(texto) }) */
 (function () {
   "use strict";
-  const VERSION = "4.4";
+  const VERSION = "4.5";
   const POKEAPI = "https://pokeapi.co/api/v2";
   const SPR = id => "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/" + id + ".png";
   const TC = { normal: "#9fa19f", fire: "#e8622a", water: "#4592e6", electric: "#e8b800", grass: "#3fa129", ice: "#3dcef3", fighting: "#d3425f", poison: "#9f5bd0", ground: "#a97a4a", flying: "#7fa4e8", psychic: "#ee6b7a", bug: "#8fa31b", rock: "#b8a86e", ghost: "#6c5aa8", dragon: "#4f60e2", dark: "#5b5466", steel: "#5a8ea5", fairy: "#ee90e6" };

@@ -2,7 +2,7 @@
 (function () {
   "use strict";
   if (typeof PAGE === "undefined" || PAGE !== "casual") return;
-  const CASUAL_VERSION = "4.4";
+  const CASUAL_VERSION = "4.5";
   if (APP_VERSION !== CASUAL_VERSION) showErr("O casual.js está em outra versão (" + CASUAL_VERSION + "). Envie todos os arquivos juntos e aperte Ctrl+F5.");
 
   const STARTERS = {
@@ -26,9 +26,29 @@
   const qs = new URLSearchParams(location.search), tq = qs.get("t");
   if (!qs.get("p") && (tq === "time" || tq === "guia")) ctab = tq === "time" ? "team" : "guide";
 
+  // Cores e Pokémon da capa de cada jogo (cartões próprios; as capas oficiais são opcionais, veja o LEIA-ME).
+  const GART = {
+    rb: ["#d62f3a", "#3f7fd6", [6, 9]], y: ["#f0c419", "#e8a000", [25]], gs: ["#d4a017", "#9aa5b1", [250, 249]], c: ["#3fc1c9", "#2b7fb4", [245]],
+    rs: ["#b3202d", "#2b5fb4", [383, 382]], e: ["#2f9e57", "#1f6b3a", [384]], frlg: ["#e8622a", "#3fa129", [6, 3]], cxd: ["#6c5aa8", "#3b2f6b", [244, 249]],
+    dp: ["#5b7fd6", "#e8a0c8", [483, 484]], pt: ["#8d96b0", "#4a5470", [487]], hgss: ["#d4a017", "#9aa5b1", [250, 249]],
+    bw: ["#2b2b2b", "#d8dde8", [643, 644]], b2w2: ["#2b2b2b", "#d8dde8", [646]], xy: ["#3f7fd6", "#d62f3a", [716, 717]], oras: ["#b3202d", "#2b5fb4", [383, 382]],
+    sm: ["#e8622a", "#6c5aa8", [791, 792]], usum: ["#e8622a", "#6c5aa8", [800]], lg: ["#f0c419", "#a9742f", [25, 133]], swsh: ["#3f7fd6", "#d62f3a", [888, 889]],
+    bdsp: ["#5b7fd6", "#e8a0c8", [483, 484]], pla: ["#7a8f3a", "#4f5a28", [493]], sv: ["#e8352a", "#7a3fc4", [1007, 1008]]
+  };
+  const covers = {};      // opcional: capas/index.json -> { "sv": "sv.jpg", ... }
+  let gOpen = false;
+  function tile(g) {
+    const a = GART[g.id] || ["#667", "#445", []], cv = covers[g.id] ? '<img class="cv" src="capas/' + esc(covers[g.id]) + '" alt="" onerror="this.remove()">' : "";
+    return '<span class="gt" style="background:linear-gradient(135deg,' + a[0] + "," + a[1] + ')"><span class="gm">' + a[2].map(id => '<img class="mc" src="' + RAW(id) + '" data-fb="' + ART(id) + '" alt="" onerror="__pkImgFail(this)">').join("") + "</span>" + cv + "</span>";
+  }
   function renderGameBar() {
-    const gens = [...new Set(GROUPS.map(g => g.gen))];
-    $("gamebar").innerHTML = '<label class="mute" for="gsel">Jogo:</label><select id="gsel">' + gens.map(gn => '<optgroup label="Geração ' + gn + '">' + GROUPS.filter(g => g.gen === gn).map(g => '<option value="' + g.id + '"' + (g.id === game ? " selected" : "") + ">" + esc(g.name) + "</option>").join("") + "</optgroup>").join("") + '</select><span class="mute">Vale para o time sugerido, o guia e a aba Pokémon.</span>';
+    const g = GROUPS.find(x => x.id === game) || GROUPS[GROUPS.length - 1], gens = [...new Set(GROUPS.map(x => x.gen))];
+    const panel = gOpen ? '<div class="gpick" role="listbox" aria-label="Escolher o jogo">' + gens.map(gn => '<div class="gg"><div class="mute ggh">Geração ' + gn + '</div><div class="ggrid">' + GROUPS.filter(x => x.gen === gn).map(x => '<button type="button" class="gtile' + (x.id === game ? " sel" : "") + '" role="option" aria-selected="' + (x.id === game) + '" data-gpick="' + x.id + '" title="' + esc(x.name) + '">' + tile(x) + '<span class="gl">' + esc(x.name) + "</span></button>").join("") + "</div></div>").join("") + "</div>" : "";
+    $("gamebar").innerHTML = '<button type="button" id="gcur" class="gcur" aria-expanded="' + gOpen + '" aria-haspopup="listbox">' + tile(g) + '<span class="gcn"><small class="mute">Jogo (vale para tudo nesta página)</small><b>' + esc(g.name) + '</b><small class="mute">Geração ' + g.gen + '</small></span><span class="gcaret" aria-hidden="true">' + (gOpen ? "▴" : "▾") + "</span></button>" + panel;
+  }
+  function setGame(id) {
+    game = id; gOpen = false; try { localStorage.setItem("pkgame", game); } catch (x) {}
+    renderGameBar(); if (mon) { renderGame(); if (mode === "casual") renderTab(); } refreshPane();
   }
   function renderTabs() {
     $("ctabs").innerHTML = TABS.map(([k, l]) => '<button class="tab" role="tab" data-ct="' + k + '" aria-selected="' + (k === ctab) + '">' + l + "</button>").join("");
@@ -173,6 +193,10 @@
 
   // ---------- eventos ----------
   document.addEventListener("click", e => {
+    if (e.target.closest("#gcur")) { gOpen = !gOpen; renderGameBar(); return; }
+    const gp = e.target.closest("[data-gpick]");
+    if (gp) { setGame(gp.dataset.gpick); return; }
+    if (gOpen && !e.target.closest("#gamebar")) { gOpen = false; renderGameBar(); }
     const ct = e.target.closest("[data-ct]");
     if (ct) { ctab = ct.dataset.ct; renderTabs(); refreshPane(); return; }
     if (e.target.closest("[data-n]")) { ctab = "poke"; renderTabs(); }
@@ -187,11 +211,12 @@
   });
   document.addEventListener("change", e => {
     const t = e.target;
-    if (t.id === "gsel") { game = t.value; try { localStorage.setItem("pkgame", game); } catch (x) {} if (mon) { renderGame(); if (mode === "casual") renderTab(); } refreshPane(); return; }
     if (t.dataset && t.dataset.csf) { const k = t.dataset.csf; if (k === "legend") FILTERS.legend = t.checked; else if (k === "final") FILTERS.finalOnly = t.checked; else if (k === "starter") FILTERS.starter = t.value; renderTeamPane(); }
     if (t.dataset && t.dataset.gg) { const st = gState(), nm = t.dataset.gg; st.got[nm] = t.checked; gSave(st); document.querySelectorAll('[data-gg="' + nm + '"]').forEach(x => { x.checked = t.checked; const row = x.closest(".pk"); if (row) row.classList.toggle("got", t.checked); }); updateCount(); }
   });
 
   document.addEventListener("toggle", e => { const d = e.target; if (d && d.matches && d.matches("details.stg") && openStg[game]) { if (d.open) openStg[game].add(d.dataset.stg); else openStg[game].delete(d.dataset.stg); } }, true);
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && gOpen) { gOpen = false; renderGameBar(); const c = $("gcur"); if (c) c.focus(); } });
+  j("capas/index.json").then(m => { if (m && typeof m === "object") { Object.assign(covers, m); renderGameBar(); } }).catch(() => {});
   renderGameBar(); renderTabs(); refreshPane();
 })();

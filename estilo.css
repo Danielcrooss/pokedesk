@@ -237,3 +237,28 @@ body[data-page="comp"] .where{display:none}
 
 input[type="checkbox"]{width:auto;padding:0;margin:0;border-radius:4px;accent-color:var(--acc)}
 .filters label{white-space:nowrap}
+
+/* ---- escolha do jogo com cartões ---- */
+.gbar{display:block;position:relative}
+.gcur{display:flex;align-items:center;gap:12px;width:100%;max-width:460px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:8px 12px;color:var(--ink);cursor:pointer;font:inherit;text-align:left}
+.gcur:hover,.gcur[aria-expanded="true"]{border-color:var(--acc)}
+.gcn{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.3}
+.gcn b{font-size:1rem}
+.gcn small{font-size:.72rem}
+.gcaret{color:var(--mute)}
+.gt{position:relative;display:flex;align-items:center;justify-content:center;aspect-ratio:4/3;border-radius:10px;overflow:hidden;flex:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
+.gcur .gt{width:76px}
+.gm{display:flex;align-items:center;justify-content:center;gap:0}
+.gm .mc{height:100%;max-height:56px;width:auto;image-rendering:pixelated;filter:drop-shadow(0 2px 2px rgba(0,0,0,.45))}
+.gm .mc+.mc{margin-left:-12px}
+.gt .cv{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.gpick{position:absolute;z-index:40;left:0;right:0;top:calc(100% + 8px);background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 18px 44px rgba(0,0,0,.5);padding:12px;max-height:min(75vh,560px);overflow:auto}
+.ggh{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;margin:8px 0 6px}
+.gg:first-child .ggh{margin-top:0}
+.ggrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:8px}
+.gtile{display:flex;flex-direction:column;gap:5px;background:none;border:2px solid transparent;border-radius:12px;padding:4px;color:var(--ink);cursor:pointer;font:inherit;text-align:center}
+.gtile:hover{background:var(--card2)}
+.gtile.sel{border-color:var(--acc);background:var(--card2)}
+.gtile .gt{width:100%}
+.gl{font-size:.74rem;line-height:1.25}
+@media(max-width:520px){.ggrid{grid-template-columns:repeat(3,1fr)}}
